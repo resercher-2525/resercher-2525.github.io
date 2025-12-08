@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Defender - High Performance Canvas Game</title>
+    <!-- Removed site-wide style.css to prevent layout conflicts -->
+    <style>
+        /* Base Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0a0a0a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden; /* Prevent scrollbars */
+            width: 100vw;
+            height: 100vh;
+            display: block; /* Ensure block layout */
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let clicks pass through to canvas */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+        }
+
+        .score-board {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00ffff;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.7);
+        }
+
+        .controls-hint {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.5);
+            text-align: right;
+        }
+
+        /* Start / Game Over Screen */
+        #menu-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 10, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            pointer-events: auto;
+            backdrop-filter: blur(5px);
+            transition: opacity 0.3s ease;
+            overflow-y: auto; /* Allow scrolling if content is too tall */
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 64px;
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #ff00cc, #3333ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(255, 0, 204, 0.5);
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            text-align: center;
+        }
+
+        .btn {
+            padding: 15px 40px;
+            font-size: 24px;
+            background: transparent;
+            color: #fff;
+            border: 2px solid #fff;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:hover {
+            background: #fff;
+            color: #000;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+        }
+
+        .btn:disabled {
+            border-color: #555;
+            color: #555;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #final-score {
+            font-size: 32px;
+            margin-bottom: 20px;
+            color: #cccccc;
+        }
+
+        /* Submission Form */
+        #submission-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            align-items: center;
+        }
+
+        #player-name-input {
+            padding: 10px 15px;
+            font-size: 18px;
+            border-radius: 5px;
+            border: none;
+            outline: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            width: 200px;
+        }
+        #player-name-input:focus {
+            border-color: #00ffff;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        #submit-btn {
+            padding: 10px 20px;
+            font-size: 18px;
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            background: transparent;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        #submit-btn:hover {
+            background: #00ffff;
+            color: #000;
+        }
+
+        /* Leaderboard */
+        #leaderboard-container {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 20px;
+        }
+
+        #leaderboard-container h3 {
+            text-align: center;
+            color: #ff00cc;
+            margin-bottom: 15px;
+            font-size: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #leaderboard-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 16px;
+        }
+
+        .leaderboard-item:last-child {
+            border-bottom: none;
+        }
+
+        .rank-name {
+            display: flex;
+            gap: 10px;
+        }
+        .rank {
+            color: #888;
+            width: 20px;
+            text-align: right;
+        }
+        .name {
+            color: #fff;
+            font-weight: bold;
+        }
+        .score {
+            color: #00ffff;
+        }
+    </style>
+</head>
+<body>
+
+    <!--<a href="index.html" class="nav-back">← Back to Home</a>*/-->
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="score-board">SCORE: <span id="scoreEl">0</span></div>
+        <div class="controls-hint">
+            WASD or Arrows to Move<br>
+            Mouse to Aim & Shoot
+        </div>
+    </div>
+
+    <div id="menu-overlay">
+        <h1 id="game-title">NEON DEFENDER</h1>
+        <p id="final-score" style="display: none;">Score: 0</p>
+
+        <!-- Submission Form -->
+        <div id="submission-form" class="hidden">
+            <input type="text" id="player-name-input" placeholder="Enter Name" maxlength="10">
+            <button id="submit-btn">SAVE SCORE</button>
+        </div>
+
+        <!-- Leaderboard -->
+        <div id="leaderboard-container" class="hidden">
+            <h3>Top Commanders</h3>
+            <ul id="leaderboard-list">
+                <li style="text-align: center; color: #666;">Loading...</li>
+            </ul>
+        </div>
+
+        <button class="btn" id="startBtn">Start Game</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-analytics.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+        /**
+         * FIREBASE CONFIGURATION
+         * ---------------------------------------------------------
+         * IMPORTANT: Replace the object below with your own Firebase project configuration.
+         * 1. Go to https://console.firebase.google.com/
+         * 2. Create a new project.
+         * 3. Add a Web App to get the config object.
+         * 4. Enable "Cloud Firestore" in the Database section.
+         * 5. Set Firestore Rules to allow read/write (for development) or secure them.
+         */
+        const firebaseConfig = {
+            apiKey: "AIzaSyCEDRIQPo8zcOd6ELx9zsaag1lgEyEWDCc",
+            authDomain: "neon-defender-scores.firebaseapp.com",
+            projectId: "neon-defender-scores",
+            storageBucket: "neon-defender-scores.firebasestorage.app",
+            messagingSenderId: "118115450960",
+            appId: "1:118115450960:web:d074c6a7c1c9d9e709d155",
+            measurementId: "G-DZ4P69S8P5"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+
+        // --- Firebase Logic ---
+        class LeaderboardManager {
+            constructor() {
+                this.db = null;
+                this.collectionName = "scores";
+                this.isConfigured = false;
+                this.init();
+            }
+
+            init() {
+                // Simple check to see if config is placeholder
+                if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+                    console.warn("Firebase not configured. Leaderboard disabled.");
+                    this.updateUIWithError("Setup Firebase to enable Leaderboard.");
+                    return;
+                }
+
+                try {
+                    const app = initializeApp(firebaseConfig);
+                    this.db = getFirestore(app);
+                    this.isConfigured = true;
+                } catch (e) {
+                    console.error("Firebase init error:", e);
+                    this.updateUIWithError("Error connecting to Leaderboard.");
+                }
+            }
+
+            async saveScore(name, score) {
+                if (!this.isConfigured) return;
+
+                try {
+                    await addDoc(collection(this.db, this.collectionName), {
+                        name: name,
+                        score: score,
+                        timestamp: new Date()
+                    });
+                    console.log("Score saved!");
+                    // Refresh leaderboard after saving
+                    await this.fetchLeaderboard();
+                    return true;
+                } catch (e) {
+                    console.error("Error adding document: ", e);
+                    alert("Failed to save score. Check console for details.");
+                    return false;
+                }
+            }
+
+            async fetchLeaderboard() {
+                if (!this.isConfigured) return;
+
+                const listEl = document.getElementById('leaderboard-list');
+                listEl.innerHTML = '<li style="text-align: center; color: #666;">Loading...</li>';
+
+                try {
+                    const q = query(collection(this.db, this.collectionName), orderBy("score", "desc"), limit(10));
+                    const querySnapshot = await getDocs(q);
+
+                    listEl.innerHTML = ""; // Clear loading
+
+                    if (querySnapshot.empty) {
+                        listEl.innerHTML = '<li style="text-align: center; color: #666;">No scores yet. Be the first!</li>';
+                        return;
+                    }
+
+                    let rank = 1;
+                    querySnapshot.forEach((doc) => {
+                        const data = doc.data();
+                        const li = document.createElement('li');
+                        li.className = 'leaderboard-item';
+                        li.innerHTML = `
+                            <div class="rank-name">
+                                <span class="rank">${rank}.</span>
+                                <span class="name">${this.escapeHtml(data.name)}</span>
+                            </div>
+                            <span class="score">${data.score}</span>
+                        `;
+                        listEl.appendChild(li);
+                        rank++;
+                    });
+                } catch (e) {
+                    console.error("Error fetching leaderboard: ", e);
+                    this.updateUIWithError("Error loading scores.");
+                }
+            }
+
+            updateUIWithError(msg) {
+                const listEl = document.getElementById('leaderboard-list');
+                if (listEl) {
+                    listEl.innerHTML = `<li style="text-align: center; color: #ff5555;">${msg}</li>`;
+                }
+            }
+
+            escapeHtml(text) {
+                if (!text) return text;
+                return text
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+        }
+
+        // --- Game Configuration Constants ---
+        const CONFIG = {
+            PLAYER_SPEED: 5,
+            PLAYER_RADIUS: 15,
+            PLAYER_COLOR: '#ffffff',
+            BULLET_SPEED: 12,
+            BULLET_RADIUS: 4,
+            ENEMY_SPAWN_RATE: 1000, // ms
+            FRICTION: 0.99, // Particle friction
+            PARTICLE_COUNT: 15 // Particles per explosion
+        };
+
+        // --- Utility Class: Vector2D ---
+        class Vector2D {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+            }
+            add(v) { return new Vector2D(this.x + v.x, this.y + v.y); }
+            sub(v) { return new Vector2D(this.x - v.x, this.y - v.y); }
+            mult(n) { return new Vector2D(this.x * n, this.y * n); }
+            mag() { return Math.sqrt(this.x * this.x + this.y * this.y); }
+            normalize() {
+                const m = this.mag();
+                return m === 0 ? new Vector2D(0, 0) : new Vector2D(this.x / m, this.y / m);
+            }
+            static random(min, max) {
+                return new Vector2D(
+                    Math.random() * (max - min) + min,
+                    Math.random() * (max - min) + min
+                );
+            }
+        }
+
+        // --- Game Entities ---
+        class Entity {
+            constructor(x, y, radius, color) {
+                this.pos = new Vector2D(x, y);
+                this.velocity = new Vector2D(0, 0);
+                this.radius = radius;
+                this.color = color;
+                this.markedForDeletion = false;
+            }
+            update() { this.pos = this.pos.add(this.velocity); }
+            draw(ctx) {
+                ctx.beginPath();
+                ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
+
+        class Player extends Entity {
+            constructor(x, y) { super(x, y, CONFIG.PLAYER_RADIUS, CONFIG.PLAYER_COLOR); }
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.pos.x, this.pos.y);
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius * 0.6, 0, Math.PI * 2);
+                ctx.fillStyle = '#00ffff';
+                ctx.fill();
+                ctx.restore();
+            }
+            move(input, canvasWidth, canvasHeight) {
+                if (input.keys['w'] || input.keys['arrowup']) this.pos.y -= CONFIG.PLAYER_SPEED;
+                if (input.keys['s'] || input.keys['arrowdown']) this.pos.y += CONFIG.PLAYER_SPEED;
+                if (input.keys['a'] || input.keys['arrowleft']) this.pos.x -= CONFIG.PLAYER_SPEED;
+                if (input.keys['d'] || input.keys['arrowright']) this.pos.x += CONFIG.PLAYER_SPEED;
+                this.pos.x = Math.max(this.radius, Math.min(canvasWidth - this.radius, this.pos.x));
+                this.pos.y = Math.max(this.radius, Math.min(canvasHeight - this.radius, this.pos.y));
+            }
+        }
+
+        class Projectile extends Entity {
+            constructor(x, y, velocity) {
+                super(x, y, CONFIG.BULLET_RADIUS, '#ffffff');
+                this.velocity = velocity;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#00ffff';
+                super.draw(ctx);
+                ctx.restore();
+            }
+        }
+
+        class Enemy extends Entity {
+            constructor(canvasWidth, canvasHeight, playerPos) {
+                const radius = Math.random() * (30 - 15) + 15;
+                let x, y;
+                if (Math.random() < 0.5) {
+                    x = Math.random() < 0.5 ? 0 - radius : canvasWidth + radius;
+                    y = Math.random() * canvasHeight;
+                } else {
+                    x = Math.random() * canvasWidth;
+                    y = Math.random() < 0.5 ? 0 - radius : canvasHeight + radius;
+                }
+                const color = `hsl(${Math.random() * 360}, 70%, 50%)`;
+                super(x, y, radius, color);
+                const angle = Math.atan2(playerPos.y - y, playerPos.x - x);
+                const speed = Math.random() * (2 - 0.5) + 0.5;
+                this.velocity = new Vector2D(Math.cos(angle) * speed, Math.sin(angle) * speed);
+                this.spin = 0;
+                this.spinSpeed = Math.random() * 0.1 - 0.05;
+                this.sides = Math.floor(Math.random() * 3) + 3;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.pos.x, this.pos.y);
+                this.spin += this.spinSpeed;
+                ctx.rotate(this.spin);
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+                ctx.beginPath();
+                for (let i = 0; i < this.sides; i++) {
+                    ctx.lineTo(
+                        this.radius * Math.cos(i * 2 * Math.PI / this.sides),
+                        this.radius * Math.sin(i * 2 * Math.PI / this.sides)
+                    );
+                }
+                ctx.closePath();
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = 0.2;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Particle extends Entity {
+            constructor(x, y, radius, color, velocity) {
+                super(x, y, radius, color);
+                this.velocity = velocity;
+                this.alpha = 1;
+            }
+            update() {
+                this.velocity = this.velocity.mult(CONFIG.FRICTION);
+                super.update();
+                this.alpha -= 0.02;
+                if (this.alpha <= 0) this.markedForDeletion = true;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                super.draw(ctx);
+                ctx.restore();
+            }
+        }
+
+        // --- Core Game Engine ---
+
+        class Game {
+            constructor(leaderboardManager) {
+                this.leaderboardManager = leaderboardManager;
+
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.uiScore = document.getElementById('scoreEl');
+                this.menuOverlay = document.getElementById('menu-overlay');
+                this.startBtn = document.getElementById('startBtn');
+                this.finalScoreEl = document.getElementById('final-score');
+                this.gameTitle = document.getElementById('game-title');
+
+                // UI Elements for Leaderboard
+                this.submissionForm = document.getElementById('submission-form');
+                this.leaderboardContainer = document.getElementById('leaderboard-container');
+                this.submitBtn = document.getElementById('submit-btn');
+                this.nameInput = document.getElementById('player-name-input');
+
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.canvas.width = this.width;
+                this.canvas.height = this.height;
+
+                this.input = {
+                    keys: {},
+                    mouse: new Vector2D(0, 0)
+                };
+
+                this.reset();
+                this.bindEvents();
+
+                // Initial resize
+                window.addEventListener('resize', () => this.resize());
+
+                // Load leaderboard initially (even before playing)
+                this.leaderboardManager.fetchLeaderboard();
+                this.leaderboardContainer.classList.remove('hidden');
+            }
+
+            reset() {
+                this.player = new Player(this.width / 2, this.height / 2);
+                this.projectiles = [];
+                this.enemies = [];
+                this.particles = [];
+                this.score = 0;
+                this.isRunning = false;
+                this.spawnTimer = 0;
+                this.updateScore(0);
+            }
+
+            bindEvents() {
+                window.addEventListener('keydown', (e) => this.input.keys[e.key.toLowerCase()] = true);
+                window.addEventListener('keyup', (e) => this.input.keys[e.key.toLowerCase()] = false);
+                window.addEventListener('blur', () => { this.input.keys = {}; });
+
+                window.addEventListener('mousemove', (e) => {
+                    this.input.mouse.x = e.clientX;
+                    this.input.mouse.y = e.clientY;
+                });
+                window.addEventListener('mousedown', (e) => {
+                    // Prevent shooting if clicking on UI (overlay)
+                    if (e.target.closest('#menu-overlay')) return;
+                    this.shoot();
+                });
+
+                this.startBtn.addEventListener('click', () => {
+                    this.startBtn.blur();
+                    this.start();
+                });
+
+                // Submit Score Event
+                this.submitBtn.addEventListener('click', () => this.handleScoreSubmit());
+            }
+
+            resize() {
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.canvas.width = this.width;
+                this.canvas.height = this.height;
+            }
+
+            start() {
+                if (this.animationId) cancelAnimationFrame(this.animationId);
+
+                this.reset();
+                this.menuOverlay.classList.add('hidden');
+
+                // Hide Leaderboard/Form during gameplay
+                this.submissionForm.classList.add('hidden');
+                this.leaderboardContainer.classList.add('hidden');
+                this.finalScoreEl.style.display = 'none';
+
+                this.isRunning = true;
+                this.animate();
+            }
+
+            gameOver() {
+                this.isRunning = false;
+                cancelAnimationFrame(this.animationId);
+
+                this.menuOverlay.classList.remove('hidden');
+                this.gameTitle.innerText = "GAME OVER";
+                this.startBtn.innerText = "PLAY AGAIN";
+                this.finalScoreEl.innerText = `Final Score: ${this.score}`;
+                this.finalScoreEl.style.display = 'block';
+
+                // Show submission form if score > 0
+                if (this.score > 0) {
+                    this.submissionForm.classList.remove('hidden');
+                    this.nameInput.value = "";
+                    this.nameInput.focus();
+                    this.submitBtn.disabled = false;
+                    this.submitBtn.innerText = "SAVE SCORE";
+                }
+
+                // Show Leaderboard
+                this.leaderboardContainer.classList.remove('hidden');
+                this.leaderboardManager.fetchLeaderboard();
+            }
+
+            async handleScoreSubmit() {
+                const name = this.nameInput.value.trim();
+                if (!name) {
+                    alert("Please enter your name!");
+                    return;
+                }
+
+                this.submitBtn.disabled = true;
+                this.submitBtn.innerText = "SAVING...";
+
+                const success = await this.leaderboardManager.saveScore(name, this.score);
+
+                if (success) {
+                    this.submissionForm.classList.add('hidden');
+                } else {
+                    this.submitBtn.disabled = false;
+                    this.submitBtn.innerText = "TRY AGAIN";
+                }
+            }
+
+            shoot() {
+                if (!this.isRunning) return;
+                const angle = Math.atan2(
+                    this.input.mouse.y - this.player.pos.y,
+                    this.input.mouse.x - this.player.pos.x
+                );
+                const velocity = new Vector2D(
+                    Math.cos(angle) * CONFIG.BULLET_SPEED,
+                    Math.sin(angle) * CONFIG.BULLET_SPEED
+                );
+                this.projectiles.push(new Projectile(this.player.pos.x, this.player.pos.y, velocity));
+            }
+
+            spawnEnemy() {
+                this.enemies.push(new Enemy(this.width, this.height, this.player.pos));
+            }
+
+            createExplosion(x, y, color) {
+                for (let i = 0; i < CONFIG.PARTICLE_COUNT; i++) {
+                    const velocity = Vector2D.random(-1, 1).mult(Math.random() * 5);
+                    this.particles.push(new Particle(x, y, Math.random() * 3, color, velocity));
+                }
+            }
+
+            updateScore(points) {
+                this.score += points;
+                this.uiScore.innerText = this.score;
+            }
+
+            update() {
+                this.player.move(this.input, this.width, this.height);
+
+                this.projectiles.forEach((p) => {
+                    p.update();
+                    if (p.pos.x < 0 || p.pos.x > this.width || p.pos.y < 0 || p.pos.y > this.height) {
+                        p.markedForDeletion = true;
+                    }
+                });
+
+                this.spawnTimer += 16;
+                if (this.spawnTimer > CONFIG.ENEMY_SPAWN_RATE) {
+                    this.spawnEnemy();
+                    this.spawnTimer = 0;
+                    if (CONFIG.ENEMY_SPAWN_RATE > 300) CONFIG.ENEMY_SPAWN_RATE -= 10;
+                }
+
+                this.enemies.forEach((enemy) => {
+                    enemy.update();
+                    const dist = Math.hypot(this.player.pos.x - enemy.pos.x, this.player.pos.y - enemy.pos.y);
+                    if (dist - enemy.radius - this.player.radius < 1) {
+                        this.gameOver();
+                    }
+
+                    this.projectiles.forEach((projectile) => {
+                        const distP = Math.hypot(projectile.pos.x - enemy.pos.x, projectile.pos.y - enemy.pos.y);
+                        if (distP - enemy.radius - projectile.radius < 1) {
+                            this.createExplosion(enemy.pos.x, enemy.pos.y, enemy.color);
+                            enemy.markedForDeletion = true;
+                            projectile.markedForDeletion = true;
+                            this.updateScore(100);
+                        }
+                    });
+                });
+
+                this.particles.forEach(p => p.update());
+
+                this.projectiles = this.projectiles.filter(p => !p.markedForDeletion);
+                this.enemies = this.enemies.filter(e => !e.markedForDeletion);
+                this.particles = this.particles.filter(p => !p.markedForDeletion);
+            }
+
+            draw() {
+                this.ctx.fillStyle = 'rgba(10, 10, 10, 0.2)';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+                this.player.draw(this.ctx);
+                this.projectiles.forEach(p => p.draw(this.ctx));
+                this.enemies.forEach(e => e.draw(this.ctx));
+                this.particles.forEach(p => p.draw(this.ctx));
+            }
+
+            animate() {
+                if (!this.isRunning) return;
+                this.animationId = requestAnimationFrame(() => this.animate());
+                this.update();
+                this.draw();
+            }
+        }
+
+        // Initialize
+        const lbManager = new LeaderboardManager();
+        const game = new Game(lbManager);
+    </script>
+</body>
+</html>
