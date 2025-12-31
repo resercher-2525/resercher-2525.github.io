@@ -1,4 +1,4 @@
-import { PointerLockControls } from 'https://threejs.org/examples/jsm/controls/PointerLockControls.js';
+import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/controls/PointerLockControls.js';
 
 let scene, camera, renderer, controls;
 
@@ -56,8 +56,11 @@ function init() {
     // Pointer Lock Controls
     controls = new PointerLockControls(camera, renderer.domElement);
     const startScreen = document.getElementById('start-screen');
-    startScreen.addEventListener('click', () => {
-        controls.lock();
+
+    document.addEventListener('keydown', (event) => {
+        if (event.code === 'Space' && !controls.isLocked) {
+            controls.lock();
+        }
     });
 
     controls.addEventListener('lock', () => {
