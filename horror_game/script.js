@@ -55,19 +55,20 @@ function init() {
 
     // Pointer Lock Controls
     controls = new PointerLockControls(camera, renderer.domElement);
+    const startUi = document.getElementById('start-ui');
+    const startButton = document.getElementById('start-button');
 
-    document.body.addEventListener('click', () => {
-        if (!controls.isLocked) {
-            controls.lock();
-        }
+    startButton.addEventListener('click', () => {
+        controls.lock();
     });
 
     controls.addEventListener('lock', () => {
+        startUi.style.display = 'none';
         document.getElementById('background-music').play();
     });
 
     controls.addEventListener('unlock', () => {
-        // Game is paused, click again to resume
+        startUi.style.display = 'flex';
     });
 
     scene.add(controls.getObject());
@@ -230,7 +231,7 @@ function animate() {
             // Win condition
             gameOver = true;
             controls.unlock();
-            alert("You Win!");
+            document.getElementById('start-button').textContent = 'You Win!';
         }
 
         // Enemies
@@ -239,7 +240,7 @@ function animate() {
                 // Game over
                 gameOver = true;
                 controls.unlock();
-                alert("Game Over");
+                document.getElementById('start-button').textContent = 'Game Over';
                 break;
             }
         }
