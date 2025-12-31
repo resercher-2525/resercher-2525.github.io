@@ -55,21 +55,19 @@ function init() {
 
     // Pointer Lock Controls
     controls = new PointerLockControls(camera, renderer.domElement);
-    const startScreen = document.getElementById('start-screen');
 
-    document.addEventListener('keydown', (event) => {
-        if (event.code === 'Space' && !controls.isLocked) {
+    document.body.addEventListener('click', () => {
+        if (!controls.isLocked) {
             controls.lock();
         }
     });
 
     controls.addEventListener('lock', () => {
-        startScreen.style.display = 'none';
         document.getElementById('background-music').play();
     });
 
     controls.addEventListener('unlock', () => {
-        startScreen.style.display = 'flex';
+        // Game is paused, click again to resume
     });
 
     scene.add(controls.getObject());
@@ -224,7 +222,6 @@ function animate() {
         if (key && playerPosition.distanceTo(key.position) < 2) {
             scene.remove(key);
             hasKey = true;
-            // You can add a message to the player here
         }
 
         // Door
@@ -232,8 +229,8 @@ function animate() {
         if (door && playerPosition.distanceTo(door.position) < 5 && hasKey) {
             // Win condition
             gameOver = true;
-            document.getElementById('start-screen-content').innerHTML = '<h1>You Win!</h1>';
             controls.unlock();
+            alert("You Win!");
         }
 
         // Enemies
@@ -241,8 +238,8 @@ function animate() {
             if (playerPosition.distanceTo(enemy.mesh.position) < 1) {
                 // Game over
                 gameOver = true;
-                document.getElementById('start-screen-content').innerHTML = '<h1>Game Over</h1>';
                 controls.unlock();
+                alert("Game Over");
                 break;
             }
         }
