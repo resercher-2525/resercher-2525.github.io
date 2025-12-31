@@ -56,8 +56,11 @@ function init() {
     // Pointer Lock Controls
     controls = new PointerLockControls(camera, renderer.domElement);
     const startScreen = document.getElementById('start-screen');
-    startScreen.addEventListener('click', () => {
-        controls.lock();
+
+    document.addEventListener('keydown', (event) => {
+        if (event.code === 'Space' && !controls.isLocked) {
+            controls.lock();
+        }
     });
 
     controls.addEventListener('lock', () => {
