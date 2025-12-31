@@ -1,4 +1,4 @@
-import { PointerLockControls } from 'https://threejs.org/examples/jsm/controls/PointerLockControls.js';
+import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/controls/PointerLockControls.js';
 
 let scene, camera, renderer, controls;
 
