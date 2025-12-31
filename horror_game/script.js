@@ -121,7 +121,7 @@ function init() {
 
     // Enemies
     const textureLoader = new THREE.TextureLoader();
-    textureLoader.load('assets/顔.webp', (texture) => {
+    textureLoader.load('assets/face.webp', (texture) => {
         for (let i = 0; i < 10; i++) {
             enemies.push(new Enemy(texture));
         }
