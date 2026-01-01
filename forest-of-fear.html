@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>恐怖の森 - Forest of Fear</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Courier New', Courier, monospace; }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+        }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px #000;
+        }
+        #message {
+            font-size: 48px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border: 2px solid #555;
+            display: block;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 10px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        #jumpscare {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            display: none !important;
+            z-index: 2147483647; /* Max Z-Index */
+            align-items: center;
+            justify-content: center;
+        }
+        #jumpscare img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            animation: jumpscare-anim 0.2s infinite;
+        }
+        @keyframes jumpscare-anim {
+            0% { transform: scale(1) rotate(0deg); }
+            25% { transform: scale(1.2) rotate(-5deg); }
+            50% { transform: scale(1.1) rotate(5deg); }
+            75% { transform: scale(1.3) rotate(-3deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="jumpscare">
+        <img src="images/face.webp" alt="FACE">
+    </div>
+    <div id="crosshair"></div>
+    <div id="ui-layer">
+        <div id="hud">Keys: 0 / 2</div>
+        <div id="message">Click to Start<br><span style="font-size:20px">Collect 2 keys and escape through the Red Gate.</span></div>
+    </div>
+
+    <!-- Import Map for Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+        // --- Game Constants ---
+        const PLAYER_SPEED = 90.0;
+        const ENEMY_SPEED = 7.0;
+        const TREE_COUNT = 150;
+        const MAP_SIZE = 100;
+        const KEY_COUNT = 2;
+        const ENEMY_COUNT = 5;
+
+        // --- Global Variables ---
+        let camera, scene, renderer, controls;
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+        let prevTime = performance.now();
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+
+        // Game State
+        let keysCollected = 0;
+        let isGameOver = false;
+        let isGameWin = false;
+        let isGameRunning = false;
+
+        // Objects
+        const trees = [];
+        const keys = [];
+        const enemies = [];
+        let exitGate;
+
+        // Audio
+        let audioCtx;
+        let bgmOscillators = [];
+
+        init();
+        animate();
+
+        function init() {
+            // Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050505);
+            scene.fog = new THREE.FogExp2(0x000000, 0.035);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.y = 1.6;
+
+            // Light
+            const ambientLight = new THREE.AmbientLight(0x222222);
+            scene.add(ambientLight);
+
+            // Flashlight
+            const flashLight = new THREE.SpotLight(0xffffff, 20, 40, 0.5, 0.5, 1);
+            flashLight.position.set(0, 0, 0);
+            flashLight.target.position.set(0, 0, -1);
+            camera.add(flashLight);
+            camera.add(flashLight.target);
+            scene.add(camera);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Controls
+            controls = new PointerLockControls(camera, document.body);
+
+            const messageBox = document.getElementById('message');
+            messageBox.addEventListener('click', () => {
+                if (!isGameRunning && !isGameOver && !isGameWin) {
+                    controls.lock();
+                } else if (isGameOver || isGameWin) {
+                    resetGame();
+                    controls.lock();
+                }
+            });
+
+            controls.addEventListener('lock', () => {
+                isGameRunning = true;
+                messageBox.style.display = 'none';
+                startAudio();
+            });
+
+            controls.addEventListener('unlock', () => {
+                isGameRunning = false;
+                if (!isGameOver && !isGameWin) {
+                    messageBox.innerHTML = 'Paused<br><span style="font-size:20px">Click to Resume</span>';
+                    messageBox.style.display = 'block';
+                }
+                stopAudio();
+            });
+
+            // Movement
+            const onKeyDown = (event) => {
+                switch (event.code) {
+                    case 'ArrowUp': case 'KeyW': moveForward = true; break;
+                    case 'ArrowLeft': case 'KeyA': moveLeft = true; break;
+                    case 'ArrowDown': case 'KeyS': moveBackward = true; break;
+                    case 'ArrowRight': case 'KeyD': moveRight = true; break;
+                }
+            };
+            const onKeyUp = (event) => {
+                switch (event.code) {
+                    case 'ArrowUp': case 'KeyW': moveForward = false; break;
+                    case 'ArrowLeft': case 'KeyA': moveLeft = false; break;
+                    case 'ArrowDown': case 'KeyS': moveBackward = false; break;
+                    case 'ArrowRight': case 'KeyD': moveRight = false; break;
+                }
+            };
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+
+            buildWorld();
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function buildWorld() {
+            // Ground
+            const groundGeo = new THREE.PlaneGeometry(MAP_SIZE * 2, MAP_SIZE * 2);
+            groundGeo.rotateX(-Math.PI / 2);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 1 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            scene.add(ground);
+
+            // Trees
+            const treeGeo = new THREE.CylinderGeometry(0.5, 1, 10, 8);
+            const treeMat = new THREE.MeshStandardMaterial({ color: 0x0f0f0f });
+            for (let i = 0; i < TREE_COUNT; i++) {
+                const tree = new THREE.Mesh(treeGeo, treeMat);
+                let x, z;
+                do {
+                    x = (Math.random() - 0.5) * MAP_SIZE;
+                    z = (Math.random() - 0.5) * MAP_SIZE;
+                } while (Math.abs(x) < 5 && Math.abs(z) < 5);
+                tree.position.set(x, 5, z);
+                scene.add(tree);
+                trees.push(tree);
+            }
+
+            // Keys
+            const keyGeo = new THREE.SphereGeometry(0.5, 16, 16);
+            const keyMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+            for (let i = 0; i < KEY_COUNT; i++) {
+                const key = new THREE.Mesh(keyGeo, keyMat);
+                let x, z;
+                do {
+                    x = (Math.random() - 0.5) * MAP_SIZE * 0.8;
+                    z = (Math.random() - 0.5) * MAP_SIZE * 0.8;
+                } while (Math.abs(x) < 10 && Math.abs(z) < 10);
+                key.position.set(x, 1, z);
+                const light = new THREE.PointLight(0xffff00, 5, 10);
+                key.add(light);
+                scene.add(key);
+                keys.push(key);
+            }
+
+            // Exit
+            const gateGeo = new THREE.BoxGeometry(4, 6, 1);
+            const gateMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            exitGate = new THREE.Mesh(gateGeo, gateMat);
+            exitGate.position.set(0, 3, -MAP_SIZE/2 + 5);
+            scene.add(exitGate);
+
+            // Enemies
+            const textureLoader = new THREE.TextureLoader();
+            const spawnDistance = 60;
+
+            // Placeholder (Black Sphere to avoid Red Screen)
+            const placeholderGeo = new THREE.SphereGeometry(1, 16, 16);
+            const placeholderMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+            for (let i = 0; i < ENEMY_COUNT; i++) {
+                const enemy = new THREE.Mesh(placeholderGeo, placeholderMat);
+                const angle = (Math.PI * 2 * i) / ENEMY_COUNT;
+                enemy.position.set(Math.cos(angle) * spawnDistance, 2, Math.sin(angle) * spawnDistance);
+                enemy.userData.offset = Math.random() * 100;
+                scene.add(enemy);
+                enemies.push(enemy);
+            }
+
+            // Load Texture from file
+            textureLoader.load(
+                'images/face.webp',
+                (texture) => {
+                    const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+                    for (let i = 0; i < enemies.length; i++) {
+                        const oldEnemy = enemies[i];
+                        const newEnemy = new THREE.Sprite(material);
+                        newEnemy.scale.set(4, 5, 1);
+                        newEnemy.position.copy(oldEnemy.position);
+                        newEnemy.userData.offset = oldEnemy.userData.offset;
+                        scene.remove(oldEnemy);
+                        scene.add(newEnemy);
+                        enemies[i] = newEnemy;
+                    }
+                },
+                undefined,
+                (err) => console.error("Error loading texture:", err)
+            );
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'key') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.5);
+            } else if (type === 'win') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(554, audioCtx.currentTime + 0.2);
+                osc.frequency.setValueAtTime(659, audioCtx.currentTime + 0.4);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 2);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 2);
+            } else if (type === 'scream') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.0);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 1.0);
+            }
+        }
+
+        function startAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (bgmOscillators.length > 0) return;
+            const osc1 = audioCtx.createOscillator();
+            const osc2 = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc1.type = 'sawtooth';
+            osc1.frequency.value = 50;
+            osc2.type = 'sine';
+            osc2.frequency.value = 55;
+            gainNode.gain.value = 0.1;
+            osc1.connect(gainNode);
+            osc2.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc1.start();
+            osc2.start();
+            bgmOscillators.push(osc1, osc2);
+        }
+
+        function stopAudio() {
+            bgmOscillators.forEach(osc => osc.stop());
+            bgmOscillators = [];
+        }
+
+        function gameOver() {
+            isGameOver = true;
+            controls.unlock();
+            playSound('scream');
+            const jumpscare = document.getElementById('jumpscare');
+            jumpscare.style.setProperty('display', 'flex', 'important');
+            setTimeout(() => {
+                jumpscare.style.setProperty('display', 'none', 'important');
+                document.getElementById('message').innerHTML = 'GAME OVER<br><span style="font-size:20px">The face got you... Click to Retry</span>';
+                document.getElementById('message').style.display = 'block';
+            }, 2000);
+        }
+
+        function gameWin() {
+            isGameWin = true;
+            controls.unlock();
+            playSound('win');
+            document.getElementById('message').innerHTML = 'YOU ESCAPED<br><span style="font-size:20px">Click to Play Again</span>';
+            document.getElementById('message').style.display = 'block';
+        }
+
+        function resetGame() {
+            keysCollected = 0;
+            isGameOver = false;
+            isGameWin = false;
+            document.getElementById('hud').textContent = `Keys: 0 / ${KEY_COUNT}`;
+            camera.position.set(0, 1.6, 0);
+            velocity.set(0, 0, 0);
+            keys.forEach(k => scene.remove(k));
+            keys.length = 0;
+            const keyGeo = new THREE.SphereGeometry(0.5, 16, 16);
+            const keyMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+            for (let i = 0; i < KEY_COUNT; i++) {
+                const key = new THREE.Mesh(keyGeo, keyMat);
+                let x, z;
+                do {
+                    x = (Math.random() - 0.5) * MAP_SIZE * 0.8;
+                    z = (Math.random() - 0.5) * MAP_SIZE * 0.8;
+                } while (Math.abs(x) < 10 && Math.abs(z) < 10);
+                key.position.set(x, 1, z);
+                const light = new THREE.PointLight(0xffff00, 5, 10);
+                key.add(light);
+                scene.add(key);
+                keys.push(key);
+            }
+            const spawnDistance = 60;
+            enemies.forEach((enemy, i) => {
+                const angle = (Math.PI * 2 * i) / ENEMY_COUNT + (Math.random() * 0.5);
+                enemy.position.set(Math.cos(angle) * spawnDistance, 2, Math.sin(angle) * spawnDistance);
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!isGameRunning) return;
+            const time = performance.now();
+            const delta = (time - prevTime) / 1000;
+            velocity.x -= velocity.x * 10.0 * delta;
+            velocity.z -= velocity.z * 10.0 * delta;
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
+            if (moveForward || moveBackward) velocity.z -= direction.z * PLAYER_SPEED * delta;
+            if (moveLeft || moveRight) velocity.x -= direction.x * PLAYER_SPEED * delta;
+            controls.moveRight(-velocity.x * delta);
+            controls.moveForward(-velocity.z * delta);
+            if (camera.position.x < -MAP_SIZE/2) camera.position.x = -MAP_SIZE/2;
+            if (camera.position.x > MAP_SIZE/2) camera.position.x = MAP_SIZE/2;
+            if (camera.position.z < -MAP_SIZE/2) camera.position.z = -MAP_SIZE/2;
+            if (camera.position.z > MAP_SIZE/2) camera.position.z = MAP_SIZE/2;
+
+            enemies.forEach(enemy => {
+                const dist = enemy.position.distanceTo(camera.position);
+                if (dist > 50) {
+                    const forward = new THREE.Vector3();
+                    camera.getWorldDirection(forward);
+                    forward.y = 0;
+                    forward.normalize();
+                    const angleOffset = (Math.random() - 0.5) * 1.5;
+                    forward.applyAxisAngle(new THREE.Vector3(0, 1, 0), angleOffset);
+                    const spawnDist = 30 + Math.random() * 10;
+                    enemy.position.copy(camera.position).add(forward.multiplyScalar(spawnDist));
+                    enemy.position.y = 2;
+                }
+                const dirToPlayer = new THREE.Vector3().subVectors(camera.position, enemy.position);
+                dirToPlayer.y = 0;
+                dirToPlayer.normalize();
+                enemy.position.add(dirToPlayer.multiplyScalar(ENEMY_SPEED * delta));
+                enemy.position.y = 2 + Math.sin(time * 0.005 + (enemy.userData.offset || 0)) * 0.5;
+                if (enemy.position.distanceTo(camera.position) < 3.0) {
+                    gameOver();
+                }
+            });
+
+            for (let i = keys.length - 1; i >= 0; i--) {
+                const key = keys[i];
+                key.rotation.y += delta;
+                if (key.position.distanceTo(camera.position) < 2.0) {
+                    scene.remove(key);
+                    keys.splice(i, 1);
+                    keysCollected++;
+                    document.getElementById('hud').textContent = `Keys: ${keysCollected} / ${KEY_COUNT}`;
+                    playSound('key');
+                    if (keysCollected === KEY_COUNT) {
+                        document.getElementById('hud').innerHTML += '<br><span style="color:red">ESCAPE VIA THE RED GATE!</span>';
+                    }
+                }
+            }
+
+            if (exitGate) {
+                const dx = Math.abs(camera.position.x - exitGate.position.x);
+                const dz = Math.abs(camera.position.z - exitGate.position.z);
+                if (dx < 2 && dz < 2) {
+                    if (keysCollected >= KEY_COUNT) {
+                        gameWin();
+                    }
+                }
+            }
+            prevTime = time;
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
