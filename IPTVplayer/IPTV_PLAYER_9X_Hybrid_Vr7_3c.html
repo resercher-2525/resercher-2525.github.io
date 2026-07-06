@@ -1,0 +1,2204 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IPTV MULTI PLAYER 9x Hybrid Vr7.3c</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.11.2/shaka-player.compiled.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700&display=swap');
+
+    :root {
+      --bg: #080c10;
+      --surface: #0d1117;
+      --panel: #111820;
+      --border: #1e2d3d;
+      --accent: #83acf8;
+      --accent2: #a7a5a5;
+      --accent3: #a78bfa;
+      --text: #c9d1d9;
+      --text-dim: #556070;
+      --playing: #00ff88;
+      --error: #ff4444;
+      --prog-bg: #0d1a27;
+      --prog-now: rgba(0,212,255,.15);
+    }
+    :root.light {
+      --bg: #f0f4f8;
+      --surface: #ffffff;
+      --panel: #e8edf3;
+      --border: #c9d4e0;
+      --accent: #0099bb;
+      --accent2: #e05a20;
+      --accent3: #7c5cbf;
+      --text: #1a2332;
+      --text-dim: #7a8fa8;
+      --playing: #00aa55;
+      --error: #cc2222;
+      --prog-bg: #dce8f5;
+      --prog-now: rgba(0,153,187,.12);
+    }
+
+    /* ── Theme toggle button ── */
+    .theme-btn {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      width: 30px; height: 30px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .2s, color .2s, border-color .2s;
+      flex-shrink: 0;
+    }
+    .theme-btn:hover { background: var(--border); color: var(--text); }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Exo 2', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      position: relative;
+    }
+    .logo { font-family: 'Share Tech Mono', monospace; font-size: 1rem; color: var(--accent); letter-spacing: 2px; }
+    .logo span { color: var(--accent2); }
+    .header-tabs { display: flex; gap: 2px; margin-left: 16px; }
+    .htab {
+      padding: 5px 14px; font-size: 0.75rem; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; cursor: pointer; border-radius: 3px; color: var(--text-dim);
+      transition: color .2s, background .2s;
+    }
+    .htab:hover { color: var(--text); background: var(--panel); }
+    .htab.active { color: var(--accent); background: rgba(0,212,255,.08); }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .header-status { font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
+    .stream-meta {
+      margin-left: 24px;
+      margin-right: 12px;
+      font-family: 'Share Tech Mono', monospace; font-size: 0.82rem; font-weight: 700;
+      color: var(--text); letter-spacing: 1px; white-space: nowrap; pointer-events: none;
+      max-width: 160px; overflow: hidden; text-overflow: ellipsis; text-align: left;
+      flex-shrink: 0;
+    }
+    .stream-meta:empty { display: none; }
+    .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); margin-right: 5px; vertical-align: middle; }
+    .dot.live { background: var(--playing); box-shadow: 0 0 6px var(--playing); animation: pulse 1.4s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .epg-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-family: 'Share Tech Mono', monospace; font-size: 0.66rem;
+      padding: 2px 8px; border-radius: 3px;
+      background: rgba(167,139,250,.12); color: var(--accent3);
+      border: 1px solid rgba(167,139,250,.25);
+    }
+
+    /* ── Layout ── */
+    .layout { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Resizers ── */
+    .resizer {
+      width: 5px;
+      flex-shrink: 0;
+      background: var(--border);
+      cursor: col-resize;
+      position: relative;
+      transition: background .15s;
+      z-index: 10;
+    }
+    .resizer:hover, .resizer.dragging { background: var(--accent); }
+    .resizer::after {
+      content: '';
+      position: absolute;
+      inset: 0 -3px;
+    }
+    .resizer-h {
+      height: 5px;
+      width: auto;
+      flex-shrink: 0;
+      background: var(--border);
+      cursor: row-resize;
+      position: relative;
+      transition: background .15s;
+      z-index: 10;
+    }
+    .resizer-h:hover, .resizer-h.dragging { background: var(--accent); }
+    .resizer-h::after {
+      content: '';
+      position: absolute;
+      inset: -3px 0;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 280px; min-width: 160px; max-width: 600px; background: var(--surface);
+      display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
+    }
+    .sidebar-header { padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; }
+    .sidebar-title { font-size: 0.68rem; font-weight: 700; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; }
+    .ch-count { margin-left: auto; font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; color: var(--accent); }
+    .search-box { display: none; } /* 検索ボックス非表示 */
+    .group-tabs {
+      display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--border);
+      scrollbar-width: none; max-height: none;
+    }
+    .group-tabs::-webkit-scrollbar { display: none; }
+    .group-tab {
+      padding: 5px 10px; font-size: 0.68rem; white-space: nowrap; cursor: pointer;
+      color: var(--text-dim); border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s, background .15s; font-weight: 700; letter-spacing: .5px;
+      flex-shrink: 0;
+    }
+    .group-tab:hover { color: var(--text); background: var(--panel); }
+    .group-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Sub group tabs (第2階層以降) ── */
+    .sub-group-tabs {
+      display: none;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+    .sub-group-tabs.show { display: flex; }
+    .sub-group-tab {
+      padding: 4px 10px; font-size: 0.65rem; white-space: nowrap; cursor: pointer;
+      color: var(--text-dim); border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s, background .15s; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .sub-group-tab:hover { color: var(--text); background: var(--border); }
+    .sub-group-tab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+    .channel-list { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    .channel-list::-webkit-scrollbar { width: 4px; }
+    .channel-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .channel-item {
+      display: flex; align-items: center; gap: 9px; padding: 8px 12px; cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,.03); transition: background .12s; position: relative;
+    }
+    .channel-item:hover { background: var(--panel); }
+    .channel-item.active { background: rgba(0,212,255,.07); border-left: 2px solid var(--accent); }
+    .channel-item.active .ch-name { color: var(--accent); }
+    .ch-logo { width: 32px; height: 32px; border-radius: 4px; object-fit: contain; background: #ffffff; flex-shrink: 0; padding: 2px; }
+    .ch-logo-placeholder {
+      width: 32px; height: 32px; border-radius: 4px; background: var(--panel);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; color: var(--accent);
+      flex-shrink: 0; border: 1px solid var(--border);
+    }
+    .ch-info { flex: 1; min-width: 0; }
+    .ch-name { font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ch-epg-mini { font-size: 0.65rem; color: var(--text-dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ch-epg-mini.has-prog { color: var(--accent3); }
+    .ch-num { font-family: 'Share Tech Mono', monospace; font-size: 0.62rem; color: var(--text-dim); }
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 8px; color: var(--text-dim); font-size: 0.8rem; padding: 20px; text-align: center; height: 100%;
+    }
+    .empty-state .icon { font-size: 2rem; }
+
+    /* ── Main / Views ── */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+    .view { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    .view.active { display: flex; }
+
+    /* ── Player view ── */
+    .video-wrap { background: #000; position: relative; flex-shrink: 0; height: 52vh; min-height: 80px; overflow: hidden; }
+    video { width: 100%; height: 100%; display: none; background: #000; object-fit: contain; }
+    .video-placeholder {
+      width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 10px; background: #000; color: var(--text-dim);
+    }
+    .video-placeholder .big-icon { font-size: 2.5rem; }
+    .video-placeholder p { font-size: 0.82rem; }
+    .error-bar { background: rgba(255,68,68,.1); border-top: 1px solid var(--error); padding: 6px 14px; font-size: 0.75rem; color: var(--error); display: none; }
+    .error-bar.show { display: block; }
+    .info-bar {
+      padding: 8px 14px; background: var(--surface); border-bottom: 1px solid var(--border);
+      display: none; align-items: flex-start; gap: 12px; flex-shrink: 0;
+    }
+    .info-bar.show { display: flex; }
+    .info-main { flex: 1; min-width: 0; }
+    .now-ch { font-size: 0.72rem; color: var(--text-dim); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .now-prog { font-size: 0.92rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .now-time { font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; color: var(--accent); margin-top: 2px; }
+    .prog-progress { height: 3px; background: var(--border); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+    .prog-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .5s; }
+    .next-prog { font-size: 0.68rem; color: var(--text-dim); margin-top: 3px; }
+    .next-prog span { color: var(--text); }
+    .now-desc { font-size: 0.7rem; color: var(--text-dim); margin-top: 3px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+    /* ── Schedule panel (player bottom) ── */
+    .epg-panel { flex: 1; overflow-y: auto; padding: 12px 14px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    .epg-panel::-webkit-scrollbar { width: 4px; }
+    .epg-panel::-webkit-scrollbar-thumb { background: var(--border); }
+    .epg-section-title {
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--text-dim); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;
+    }
+    .epg-section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+    .prog-item {
+      display: flex; gap: 10px; padding: 8px 10px; border-radius: 5px; margin-bottom: 4px;
+      border: 1px solid transparent; transition: background .12s;
+    }
+    .prog-item:hover { background: var(--panel); }
+    .prog-item.now { background: var(--prog-now); border-color: rgba(0,212,255,.2); }
+    .prog-item.now .pt { color: var(--accent); }
+    .prog-item.past { opacity: .45; }
+    .pt { font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; color: var(--text-dim); width: 48px; flex-shrink: 0; padding-top: 1px; }
+    .pi { flex: 1; min-width: 0; }
+    .pi-title { font-size: 0.82rem; font-weight: 600; }
+    .pi-dur { font-size: 0.65rem; color: var(--text-dim); margin-top: 1px; }
+    .pi-desc { font-size: 0.7rem; color: var(--text-dim); margin-top: 3px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .now-badge {
+      font-family: 'Share Tech Mono', monospace; font-size: 0.58rem; background: var(--accent);
+      color: #000; padding: 1px 5px; border-radius: 2px; margin-left: 6px; vertical-align: middle;
+    }
+    .no-epg-msg { color: var(--text-dim); font-size: 0.8rem; text-align: center; padding: 20px; }
+
+    /* ── EPG Grid view ── */
+    .epg-grid-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .epg-grid-toolbar {
+      padding: 8px 14px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0; background: var(--surface);
+    }
+    .epg-grid-toolbar label { font-size: 0.72rem; color: var(--text-dim); font-weight: 600; }
+    .epg-grid-toolbar input[type=date] {
+      background: var(--panel); border: 1px solid var(--border); color: var(--text);
+      padding: 4px 8px; border-radius: 4px; font-family: 'Exo 2', sans-serif; font-size: 0.75rem;
+      outline: none; color-scheme: dark;
+    }
+    .epg-grid-toolbar input[type=date]:focus { border-color: var(--accent); }
+    .epg-grid-info { font-size: 0.7rem; color: var(--text-dim); margin-left: auto; }
+    .epg-empty2 { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--text-dim); font-size: 0.82rem; height: 100%; }
+    .epg-empty2 .icon { font-size: 2.5rem; }
+
+    /* Grid: two-pane layout — left fixed, right scrollable */
+    .epg-grid-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+    /* Left: fixed channel column */
+    .epg-left {
+      width: 130px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+      z-index: 3;
+    }
+    .epg-left-header {
+      height: 28px;
+      flex-shrink: 0;
+      padding: 5px 8px;
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      font-weight: 700;
+      letter-spacing: 1px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .epg-left-rows {
+      flex: 1;
+      overflow: hidden; /* vertical scroll synced with right */
+    }
+    .epg-left-cell {
+      height: 46px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+      background: var(--surface);
+    }
+    /* Right: scrollable timeline */
+    .epg-right {
+      flex: 1;
+      overflow: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+      position: relative;
+    }
+    .epg-right::-webkit-scrollbar { width: 6px; height: 6px; }
+    .epg-right::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .epg-header-row {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: var(--surface);
+      height: 28px;
+    }
+    .epg-header-slot {
+      flex-shrink: 0;
+      border-right: 1px solid var(--border);
+      padding: 5px 6px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.62rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+      line-height: 18px;
+    }
+    .epg-row {
+      display: flex;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+      height: 46px;
+      position: relative;
+    }
+    .epg-timeline { position: relative; flex-shrink: 0; height: 100%; }
+    .epg-block {
+      position: absolute; top: 2px; bottom: 2px;
+      background: var(--prog-bg); overflow: hidden; display: flex; flex-direction: column;
+      justify-content: center; padding: 3px 5px; cursor: pointer; transition: background .12s;
+      border-radius: 3px; border-right: 1px solid rgba(255,255,255,.05);
+    }
+    .epg-block:hover { background: var(--panel); }
+    .epg-block.now { background: var(--prog-now); border-left: 2px solid var(--accent); }
+    .epg-block.past { opacity: .38; }
+    .epg-block-title { font-size: 0.68rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .epg-block-time { font-family: 'Share Tech Mono', monospace; font-size: 0.57rem; color: var(--text-dim); margin-top: 1px; }
+    .now-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent2); z-index: 5; pointer-events: none; opacity: .8; }
+
+    .mini-logo { width: 20px; height: 20px; border-radius: 3px; object-fit: contain; flex-shrink: 0; background: #fff; padding: 1px; }
+    .mini-name { font-size: 0.68rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+    .mini-name:hover { color: var(--accent); }
+
+    /* Tooltip */
+    .epg-tooltip {
+      position: fixed; background: var(--surface); border: 1px solid var(--accent); border-radius: 5px;
+      padding: 10px 12px; max-width: 260px; z-index: 100; pointer-events: none; display: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,.6);
+    }
+    .epg-tooltip.show { display: block; }
+    .tt-title { font-size: 0.85rem; font-weight: 700; margin-bottom: 4px; }
+    .tt-time { font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; color: var(--accent); margin-bottom: 4px; }
+    .tt-desc { font-size: 0.72rem; color: var(--text-dim); }
+
+    /* ── Import view ── */
+    .import-view { flex: 1; overflow-y: auto; padding: 20px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    .import-view::-webkit-scrollbar { width: 4px; }
+    .import-view::-webkit-scrollbar-thumb { background: var(--border); }
+    .import-section { margin-bottom: 20px; }
+    .import-section h2 {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    }
+    .import-section h2::after { content:''; flex:1; height:1px; background:var(--border); }
+    .import-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media(max-width:700px) { .import-grid { grid-template-columns:1fr; } .layout { flex-direction: column; } .sidebar { width:100%; height:200px; min-width:unset; } }
+    .import-card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px; }
+    .import-card h3 { font-size: 0.72rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 9px; }
+    .import-card textarea, .import-card input[type=text] {
+      width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text);
+      border-radius: 4px; padding: 7px 9px; font-family: 'Share Tech Mono', monospace; font-size: 0.73rem;
+      outline: none; resize: vertical; transition: border-color .2s;
+    }
+    .import-card textarea { min-height: 90px; }
+    .import-card textarea:focus, .import-card input[type=text]:focus { border-color: var(--accent); }
+    .import-card textarea::placeholder, .import-card input[type=text]::placeholder { color: var(--text-dim); }
+    .btn { margin-top: 8px; padding: 7px 14px; border: none; border-radius: 4px; cursor: pointer; font-family: 'Exo 2', sans-serif; font-size: 0.76rem; font-weight: 700; letter-spacing: 1px; transition: opacity .2s, transform .1s; }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-accent2 { background: var(--accent2); color: #fff; }
+    .btn-accent3 { background: var(--accent3); color: #fff; }
+    .btn:hover { opacity: .85; }
+    .file-drop { border: 2px dashed var(--border); border-radius: 5px; padding: 18px 14px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; font-size: 0.78rem; color: var(--text-dim); }
+    .file-drop:hover, .file-drop.drag-over { border-color: var(--accent); background: rgba(0,212,255,.04); color: var(--text); }
+    .file-drop input { display: none; }
+    .url-list { display: grid; gap: 7px; }
+    .url-row { display: grid; grid-template-columns: 28px minmax(0,1fr) auto; gap: 8px; align-items: center; }
+    .url-index { font-family: 'Share Tech Mono', monospace; font-size: 0.66rem; color: var(--text-dim); text-align: center; }
+    .url-row input { min-width: 0; }
+    .url-row .btn { margin-top: 0; padding-left: 12px; padding-right: 12px; white-space: nowrap; }
+    .section-reset-btn {
+      margin: 0 0 0 8px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px;
+      background: transparent; color: var(--text-dim); cursor: pointer; font-family: 'Exo 2', sans-serif;
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 1px; transition: background .2s, color .2s, border-color .2s;
+    }
+    .section-reset-btn:hover { background: rgba(255,68,68,.12); border-color: var(--error); color: var(--error); }
+    @media(max-width:520px) { .url-row { grid-template-columns: 24px minmax(0,1fr); } .url-row .btn { grid-column: 2; } }
+
+    /* ── Mute button ── */
+    .mute-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+      width: 30px; height: 26px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s, color .15s, border-color .15s; flex-shrink: 0; margin-left: 2px;
+    }
+    .mute-btn:hover { background: var(--panel); color: var(--text); }
+    .mute-btn.muted { border-color: var(--error); color: var(--error); }
+    .stop-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+      width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s, color .15s, border-color .15s; flex-shrink: 0; margin-left: 2px;
+    }
+    .stop-btn:hover { background: rgba(255,68,68,.15); border-color: var(--error); color: var(--error); }
+
+    /* ── VLC button ── */
+    .vlc-btn {
+      display: none; align-items: center; gap: 5px; padding: 5px 10px;
+      background: #ff7700; color: #fff; border: none; border-radius: 4px;
+      font-family: 'Exo 2', sans-serif; font-size: 0.72rem; font-weight: 700;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0; transition: opacity .2s;
+    }
+    .vlc-btn:hover { opacity: .85; }
+    .vlc-btn.show { display: flex; }
+
+    /* ── Multi view ── */
+    .multi-view-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #000; }
+    .multi-toolbar {
+      display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+      background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .multi-toolbar label { font-size: 0.72rem; color: var(--text-dim); font-weight: 700; letter-spacing: 1px; }
+    .layout-btn {
+      padding: 4px 12px; border: 1px solid var(--border); background: var(--panel);
+      color: var(--text-dim); border-radius: 4px; cursor: pointer;
+      font-family: 'Exo 2', sans-serif; font-size: 0.75rem; font-weight: 700; transition: all .15s;
+    }
+    .layout-btn:hover { border-color: var(--accent); color: var(--text); }
+    .layout-btn.active { border-color: var(--accent); background: rgba(0,212,255,.1); color: var(--accent); }
+    .multi-hint { font-size: 0.68rem; color: var(--text-dim); margin-left: auto; }
+    .multi-grid { flex: 1; display: grid; gap: 2px; background: #111; overflow: hidden; }
+    .multi-grid.layout-2 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+    .multi-grid.layout-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    .multi-grid.layout-6 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    .multi-grid.layout-8 { grid-template-columns: 1fr 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    .multi-grid.layout-9 { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; }
+    .multi-cell {
+      position: relative; background: #000; overflow: hidden; cursor: pointer;
+      border: 2px solid transparent; transition: border-color .15s;
+    }
+    .multi-cell:hover { border-color: rgba(0,212,255,.4); }
+    .multi-cell.active-audio { border-color: var(--accent); }
+    .multi-cell.selected-cell { outline: 2px dashed var(--accent2); outline-offset: -2px; }
+    .multi-cell-num {
+      position: absolute; top: 6px; left: 6px;
+      font-family: 'Share Tech Mono', monospace; font-size: 0.65rem;
+      background: rgba(0,0,0,.55); color: rgba(255,255,255,.6);
+      padding: 1px 5px; border-radius: 3px; pointer-events: none;
+    }
+    .multi-cell-label {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 4px 8px; background: linear-gradient(transparent, rgba(0,0,0,.8));
+      font-size: 0.7rem; font-weight: 600; color: #fff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+    }
+    .multi-cell-empty {
+      width: 100%; height: 100%; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 6px;
+      color: var(--text-dim); font-size: 0.78rem; pointer-events: none;
+    }
+    .multi-cell-empty .icon { font-size: 1.8rem; }
+    .multi-audio-icon {
+      position: absolute; top: 6px; right: 6px; font-size: 0.9rem;
+      pointer-events: none; opacity: 0; transition: opacity .2s;
+    }
+    .multi-cell.active-audio .multi-audio-icon { opacity: 1; }
+    .multi-epg-now {
+      position: absolute; top: 6px; left: 36px; right: 30px; font-size: 0.62rem;
+      color: rgba(255,255,255,.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,.8);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">IPTV<span>///</span>PLAYER 9X Hybrid Vr7.3c</div>
+  <div class="header-tabs">
+    <div class="htab" onclick="switchView('player')" id="htab-player">▶️視聴</div>
+    <button class="stop-btn" onclick="stopAll()" title="再生停止・リセット">⏹️</button>
+    <div class="htab" onclick="switchView('epg')" id="htab-epg">📅 番組表</div>
+    <div class="htab" onclick="switchView('multi')" id="htab-multi">🪟マルチ</div>
+    <div class="htab active" onclick="switchView('import')" id="htab-import">⚙️設定</div>
+    <button id="muteBtn" onclick="toggleMute()" title="ミュート切替" class="mute-btn">🔊</button>
+  </div>
+  <div class="header-right">
+    <div class="stream-meta" id="streamMeta"></div>
+    <span class="epg-badge" id="epgBadge" style="display:none"></span>
+    <div class="net-indicator" id="netIndicator" style="display:none">
+      <span id="netSpeed" style="font-family:'Share Tech Mono',monospace;font-size:0.8rem;color:var(--text-dim);min-width:80px;text-align:right">0 KB/s</span>
+      <div style="width:60px;height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin-left:4px">
+        <div id="bufBar" style="height:100%;width:0%;background:var(--playing);border-radius:3px;transition:width .3s,background .3s"></div>
+      </div>
+      <span id="bufSec" style="font-family:'Share Tech Mono',monospace;font-size:0.78rem;color:var(--text-dim);margin-left:3px">0s</span>
+    </div>
+    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="ライト/ダークモード切替">🌙</button>
+    <div class="header-status">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">待機中</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">チャンネル</span>
+      <span class="ch-count" id="chCount">0 ch</span>
+    </div>
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="チャンネルを検索..." oninput="filterChannels()" />
+    </div>
+    <div class="group-tabs" id="groupTabs"></div>
+    <div class="sub-group-tabs" id="subGroupTabs"></div>
+    <div class="channel-list" id="channelList">
+      <div class="empty-state">
+        <div class="icon">📡</div>
+        <p>M3U8プレイリストを<br>読み込んでください</p>
+      </div>
+    </div>
+  </div><!-- /sidebar -->
+
+  <div class="resizer" id="resizerV" title="ドラッグで幅を調整"></div>
+
+  <div class="main">
+
+    <!-- Player view -->
+    <div class="view" id="view-player">
+      <div class="video-wrap" id="videoWrap">
+        <video id="video" controls autoplay></video>
+        <div class="video-placeholder" id="placeholder">
+          <div class="big-icon">📺</div>
+          <p>チャンネルを選択してください</p>
+        </div>
+      </div>
+      <div class="error-bar" id="errorBar"></div>
+      <div class="info-bar" id="infoBar">
+        <div class="info-main">
+          <div class="now-ch" id="nowCh"></div>
+          <div class="now-prog" id="nowProg">—</div>
+          <div class="now-time" id="nowTime"></div>
+          <div class="prog-progress"><div class="prog-progress-fill" id="progFill" style="width:0%"></div></div>
+          <div class="next-prog" id="nextProg"></div>
+          <div class="now-desc" id="nowDesc"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+          <span class="dot live" id="liveDot" style="display:none"></span>
+          <button class="vlc-btn" id="vlcBtn" onclick="openInVlc()">🎬 VLCで開く</button>
+        </div>
+      </div>
+      <div class="resizer-h" id="resizerH" title="ドラッグで高さを調整"></div>
+      <div class="epg-panel" id="epgPanel">
+        <div class="no-epg-msg">チャンネルを選択すると番組表が表示されます</div>
+      </div>
+    </div>
+
+    <!-- EPG Grid view -->
+    <div class="view" id="view-epg">
+      <div class="epg-grid-wrap">
+        <div class="epg-grid-toolbar">
+          <label>日付</label>
+          <input type="date" id="epgDatePicker" onchange="renderEpgGrid()" />
+          <span class="epg-grid-info" id="epgGridInfo"></span>
+        </div>
+        <div class="epg-grid-body" id="epgGridBody">
+          <div class="epg-empty2" id="epgEmpty2">
+            <div class="icon">📅</div>
+            <p>EPGデータを読み込んでください</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Multi view -->
+    <div class="view" id="view-multi">
+      <div class="multi-view-wrap">
+        <div class="multi-toolbar">
+          <label>レイアウト</label>
+          <button class="layout-btn active" onclick="setMultiLayout(2)" id="mlBtn2">２画面</button>
+          <button class="layout-btn" onclick="setMultiLayout(4)" id="mlBtn4">４画面</button>
+          <button class="layout-btn" onclick="setMultiLayout(6)" id="mlBtn6">６画面</button>
+          <button class="layout-btn" onclick="setMultiLayout(8)" id="mlBtn8">８画面</button>
+          <button class="layout-btn" onclick="setMultiLayout(9)" id="mlBtn9">９画面</button>
+          <span class="multi-hint">クリック→音声切替 ／ ダブルクリック→1画面 ／ サイドバーからチャンネルをクリックで割り当て</span>
+        </div>
+        <div class="multi-grid layout-2" id="multiGrid"></div>
+      </div>
+    </div>
+
+    <!-- Import/Settings view -->
+    <div class="view active" id="view-import">
+      <div class="import-view">
+        <div class="import-section">
+          <h2>📡 M3U プレイリスト <button class="section-reset-btn" onclick="resetM3U()" title="読み込み済みプレイリストをリセット">リセット</button></h2>
+          <div class="import-grid">
+            <div class="import-card">
+              <h3>📁 ファイル</h3>
+              <div class="file-drop" id="m3uDrop" onclick="document.getElementById('m3uFile').click()"
+                ondragover="onDragOver(event,'m3uDrop')" ondragleave="onDragLeave('m3uDrop')" ondrop="onDropM3U(event)">
+                <input type="file" id="m3uFile" accept=".m3u,.m3u8" onchange="handleM3UFile(event)" />
+                クリック or ドロップ<br><small>.m3u / .m3u8</small>
+              </div>
+            </div>
+            <div class="import-card">
+              <h3>📋 テキスト貼り付け</h3>
+              <textarea id="m3uPaste" placeholder="#EXTM3U&#10;#EXTINF:-1 tvg-name=&quot;NHK&quot; tvg-id=&quot;NHK&quot;,NHK&#10;http://example.com/nhk.m3u8"></textarea>
+              <button class="btn btn-primary" onclick="loadM3UFromText()">読み込む</button>
+            </div>
+          </div>
+          <div class="import-card" style="margin-top:10px">
+            <h3>🔗 URL</h3>
+            <div class="url-list">
+              <div class="url-row">
+                <span class="url-index">1</span>
+                <input type="text" id="m3uUrl" placeholder="https://example.com/playlist.m3u8" oninput="saveUrlInputs('m3u',5,'iptv_m3u_urls','iptv_m3u_url')" />
+                <button class="btn btn-primary" onclick="loadM3UFromUrl(1)">取得</button>
+              </div>
+              <div class="url-row">
+                <span class="url-index">2</span>
+                <input type="text" id="m3uUrl2" placeholder="https://example.com/playlist2.m3u8" oninput="saveUrlInputs('m3u',5,'iptv_m3u_urls','iptv_m3u_url')" />
+                <button class="btn btn-primary" onclick="loadM3UFromUrl(2)">取得</button>
+              </div>
+              <div class="url-row">
+                <span class="url-index">3</span>
+                <input type="text" id="m3uUrl3" placeholder="https://example.com/playlist3.m3u8" oninput="saveUrlInputs('m3u',5,'iptv_m3u_urls','iptv_m3u_url')" />
+                <button class="btn btn-primary" onclick="loadM3UFromUrl(3)">取得</button>
+              </div>
+              <div class="url-row">
+                <span class="url-index">4</span>
+                <input type="text" id="m3uUrl4" placeholder="https://example.com/playlist4.m3u8" oninput="saveUrlInputs('m3u',5,'iptv_m3u_urls','iptv_m3u_url')" />
+                <button class="btn btn-primary" onclick="loadM3UFromUrl(4)">取得</button>
+              </div>
+              <div class="url-row">
+                <span class="url-index">5</span>
+                <input type="text" id="m3uUrl5" placeholder="https://example.com/playlist5.m3u8" oninput="saveUrlInputs('m3u',5,'iptv_m3u_urls','iptv_m3u_url')" />
+                <button class="btn btn-primary" onclick="loadM3UFromUrl(5)">取得</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="import-section">
+          <h2>📅 EPG (XMLTV形式) <button class="section-reset-btn" onclick="resetEPG()" title="読み込み済みEPGをリセット">リセット</button></h2>
+          <div class="import-grid">
+            <div class="import-card">
+              <h3>📁 ファイル</h3>
+              <div class="file-drop" id="epgDrop" onclick="document.getElementById('epgFile').click()"
+                ondragover="onDragOver(event,'epgDrop')" ondragleave="onDragLeave('epgDrop')" ondrop="onDropEPG(event)">
+                <input type="file" id="epgFile" accept=".xml,.xmltv" onchange="handleEPGFile(event)" />
+                クリック or ドロップ<br><small>.xml / .xmltv</small>
+              </div>
+            </div>
+            <div class="import-card">
+              <h3>📋 XMLテキスト貼り付け</h3>
+              <textarea id="epgPaste" placeholder="&lt;?xml version=&quot;1.0&quot;?&gt;&#10;&lt;tv&gt;...&lt;/tv&gt;"></textarea>
+              <button class="btn btn-accent3" onclick="loadEPGFromText()">読み込む</button>
+            </div>
+          </div>
+          <div class="import-card" style="margin-top:10px">
+            <h3>🔗 URL</h3>
+            <div class="url-list">
+              <div class="url-row">
+                <span class="url-index">1</span>
+                <input type="text" id="epgUrl" placeholder="https://example.com/epg.xml" oninput="saveUrlInputs('epg',3,'iptv_epg_urls','iptv_epg_url')" />
+                <button class="btn btn-accent3" onclick="loadEPGFromUrl(1)">取得</button>
+              </div>
+              <div class="url-row">
+                <span class="url-index">2</span>
+                <input type="text" id="epgUrl2" placeholder="https://example.com/epg2.xml" oninput="saveUrlInputs('epg',3,'iptv_epg_urls','iptv_epg_url')" />
+                <button class="btn btn-accent3" onclick="loadEPGFromUrl(2)">取得</button>
+              </div>
+              <div class="url-row">
+                <span class="url-index">3</span>
+                <input type="text" id="epgUrl3" placeholder="https://example.com/epg3.xml" oninput="saveUrlInputs('epg',3,'iptv_epg_urls','iptv_epg_url')" />
+                <button class="btn btn-accent3" onclick="loadEPGFromUrl(3)">取得</button>
+              </div>
+            </div>
+            <p style="margin-top:6px;font-size:.7rem;color:var(--text-dim)">※ CORSの制限により一部URLは取得できない場合があります。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Tooltip -->
+<div class="epg-tooltip" id="epgTooltip">
+  <div class="tt-title" id="ttTitle"></div>
+  <div class="tt-time"  id="ttTime"></div>
+  <div class="tt-desc"  id="ttDesc"></div>
+</div>
+
+<script>
+// ═══ STATE ═══════════════════════════════════
+let allChannels = [], filteredChannels = [];
+let activeGroup = '';    // 第1階層
+let activeSubGroup = ''; // 第2階層（空なら第1階層直下のチャンネルを表示）
+let activeIndex = -1;
+let shakaPlayer = null; // Shaka Playerインスタンス
+let hlsFallback = null; // Shakaで失敗したH.264 HLS用フォールバック
+let streamManifestMeta = null;
+let mainRecoveryCleanup = null;
+const HLS_MIME_TYPE = 'application/x-mpegURL';
+
+async function loadAsHls(player, url) {
+  const cleanUrl = url.replace(/[\s\/]+$/, '');
+  await player.load(cleanUrl, null, HLS_MIME_TYPE);
+}
+
+function shakaRetryParameters() {
+  return {
+    timeout: 0,
+    stallTimeout: 5000,
+    connectionTimeout: 10000,
+    maxAttempts: 99,
+    baseDelay: 500,
+    backoffFactor: 1.5,
+    fuzzFactor: 0.3,
+  };
+}
+
+function shakaLiveConfig(bufferingGoal) {
+  return {
+    manifest: {
+      retryParameters: shakaRetryParameters(),
+    },
+    streaming: {
+      bufferingGoal,
+      rebufferingGoal: 2,
+      bufferBehind: 30,
+      retryParameters: shakaRetryParameters(),
+      updateIntervalSeconds: 1,
+      inaccurateManifestTolerance: 2,
+      stallEnabled: true,
+      stallThreshold: 5,
+      stallSkip: 0,
+      gapDetectionThreshold: 0.25,
+      gapJumpTimerTime: 0.25,
+      segmentPrefetchLimit: 2,
+    },
+  };
+}
+
+function bufferedAheadOf(media) {
+  if (!media || !media.buffered) return 0;
+  const ct = media.currentTime;
+  for (let i = 0; i < media.buffered.length; i++) {
+    if (media.buffered.start(i) <= ct + 0.5 && media.buffered.end(i) >= ct) {
+      return Math.max(0, media.buffered.end(i) - ct);
+    }
+  }
+  return 0;
+}
+
+function attachShakaRecovery(player, media, url, isCurrent, onRecovering, onRecovered) {
+  let disposed = false;
+  let recovering = false;
+  let lastTime = media.currentTime || 0;
+  let lastMoveAt = performance.now();
+  let lastRecoverAt = 0;
+
+  const markProgress = () => {
+    if (Math.abs((media.currentTime || 0) - lastTime) > 0.15) {
+      lastTime = media.currentTime || 0;
+      lastMoveAt = performance.now();
+    }
+  };
+
+  const recover = async (reason) => {
+    if (disposed || recovering || !isCurrent()) return;
+    const now = performance.now();
+    if (now - lastRecoverAt < 15000) return;
+    lastRecoverAt = now;
+    recovering = true;
+    if (onRecovering) onRecovering(reason);
+    try {
+      let retried = false;
+      if (player && typeof player.retryStreaming === 'function') {
+        retried = await player.retryStreaming(0.1);
+      }
+      if (!retried && isCurrent()) {
+        await media.play().catch(()=>{});
+      }
+      lastTime = media.currentTime || 0;
+      lastMoveAt = performance.now();
+      if (onRecovered) onRecovered(reason);
+    } catch(e) {
+      console.warn('Shaka recovery failed:', reason, e);
+    } finally {
+      recovering = false;
+    }
+  };
+
+  const check = () => {
+    if (disposed || !isCurrent() || media.paused || media.ended) return;
+    markProgress();
+    const stalledFor = performance.now() - lastMoveAt;
+    const ahead = bufferedAheadOf(media);
+    if (stalledFor > 9000 && ahead < 0.5) recover('stall-watchdog');
+  };
+
+  const onWaiting = () => setTimeout(() => {
+    if (!disposed && isCurrent() && !media.paused && bufferedAheadOf(media) < 0.5) recover('waiting');
+  }, 5000);
+  const onStalled = () => setTimeout(() => {
+    if (!disposed && isCurrent() && !media.paused && bufferedAheadOf(media) < 0.5) recover('stalled');
+  }, 5000);
+
+  media.addEventListener('timeupdate', markProgress);
+  media.addEventListener('playing', markProgress);
+  media.addEventListener('waiting', onWaiting);
+  media.addEventListener('stalled', onStalled);
+  const timer = setInterval(check, 1000);
+
+  return () => {
+    disposed = true;
+    clearInterval(timer);
+    media.removeEventListener('timeupdate', markProgress);
+    media.removeEventListener('playing', markProgress);
+    media.removeEventListener('waiting', onWaiting);
+    media.removeEventListener('stalled', onStalled);
+  };
+}
+
+function shakaFallbackError(error) {
+  const code = error && error.code;
+  return code === 3016 || code === 4032;
+}
+
+function destroyHlsFallback() {
+  if (hlsFallback) { hlsFallback.destroy(); hlsFallback = null; }
+}
+
+function hlsJsConfig() {
+  return {
+    enableWorker: false,
+    lowLatencyMode: true,
+    liveSyncDurationCount: 3,
+    liveMaxLatencyDurationCount: 10,
+    backBufferLength: 30,
+    manifestLoadingMaxRetry: 10,
+    manifestLoadingRetryDelay: 500,
+    levelLoadingMaxRetry: 10,
+    levelLoadingRetryDelay: 500,
+    fragLoadingMaxRetry: 10,
+    fragLoadingRetryDelay: 500,
+  };
+}
+
+function codecFamily(meta) {
+  return codecLabelFromCodecs(meta && meta.codec ? meta.codec : '');
+}
+
+function preferHlsJsForMeta(meta) {
+  return codecFamily(meta) === 'h264';
+}
+
+function preferShakaForMeta(meta) {
+  const codec = codecFamily(meta);
+  return codec === 'h265' || codec === 'av1' || codec === 'vp9';
+}
+async function startMainHlsJsFallback(idx, ch, reason) {
+  if (!ch || activeIndex !== idx) return false;
+  if (!window.Hls || !Hls.isSupported()) {
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      if (mainRecoveryCleanup) { mainRecoveryCleanup(); mainRecoveryCleanup = null; }
+      if (shakaPlayer) { await shakaPlayer.destroy(); shakaPlayer = null; }
+      destroyHlsFallback();
+      video.src = ch.url.replace(/[\s\/]+$/, '');
+      await video.play().catch(()=>{});
+      hideError(); setStatus('再生中', true);
+      return true;
+    }
+    return false;
+  }
+
+  if (mainRecoveryCleanup) { mainRecoveryCleanup(); mainRecoveryCleanup = null; }
+  if (shakaPlayer) { await shakaPlayer.destroy(); shakaPlayer = null; }
+  destroyHlsFallback();
+
+  setStatus(reason === 'prefer-h264' ? 'HLS.js接続中...' : 'HLS.jsへ切替中...', false);
+  hlsFallback = new Hls(hlsJsConfig());
+  if (window._addHlsBytesHook) window._addHlsBytesHook(hlsFallback);
+  hlsFallback.loadSource(ch.url.replace(/[\s\/]+$/, ''));
+  hlsFallback.attachMedia(video);
+  hlsFallback.on(Hls.Events.MANIFEST_PARSED, async () => {
+    if (activeIndex !== idx) return;
+    hideError();
+    await video.play().catch(()=>{});
+    updateStreamMeta();
+    setStatus('HLS.js再生中', true);
+    liveDot.style.display = 'inline-block';
+  });
+  hlsFallback.on(Hls.Events.ERROR, (_, data) => {
+    if (!data || !data.fatal) return;
+    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+      hlsFallback.startLoad();
+    } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+      hlsFallback.recoverMediaError();
+    } else {
+      showError('HLS.js再生エラー: ' + (data.details || reason || '不明'));
+      setStatus('エラー', false);
+      liveDot.style.display = 'none';
+    }
+  });
+  return true;
+}
+
+function startCellHlsJsFallback(mc, cellIdx, chIdx, ch) {
+  if (!window.Hls || !Hls.isSupported()) {
+    if (mc.video.canPlayType('application/vnd.apple.mpegurl')) {
+      mc.video.src = ch.url.replace(/[\s\/]+$/, '');
+      mc.video.play().catch(()=>{});
+      return true;
+    }
+    return false;
+  }
+  if (mc.hlsFallback) { mc.hlsFallback.destroy(); mc.hlsFallback = null; }
+  const h = new Hls(hlsJsConfig());
+  mc.hlsFallback = h;
+  if (window._addHlsBytesHook) window._addHlsBytesHook(h);
+  h.loadSource(ch.url.replace(/[\s\/]+$/, ''));
+  h.attachMedia(mc.video);
+  h.on(Hls.Events.MANIFEST_PARSED, () => {
+    if (multiCells[cellIdx] === mc && mc.chIdx === chIdx) mc.video.play().catch(()=>{});
+  });
+  h.on(Hls.Events.ERROR, (_, data) => {
+    if (!data || !data.fatal) return;
+    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) h.startLoad();
+    else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) h.recoverMediaError();
+    else console.warn('Multi HLS.js fallback error:', data);
+  });
+  return true;
+}
+function attrValue(text, name) {
+  const m = text.match(new RegExp(name + '=("[^"]*"|[^,]*)', 'i'));
+  return m ? m[1].replace(/^"|"$/g, '') : '';
+}
+function resolveStreamUrl(base, next) {
+  try { return new URL(next, base).href; } catch(e) { return next; }
+}
+function betterMeta(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return {
+    codec: a.codec || b.codec || '',
+    height: Math.max(a.height || 0, b.height || 0),
+    nextUrl: a.nextUrl || b.nextUrl || '',
+    segmentUrl: a.segmentUrl || b.segmentUrl || ''
+  };
+}
+function firstMediaSegmentUrl(text, baseUrl) {
+  const lines = text.replace(/\r/g, '').split('\n');
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    if (/\.(m3u8?|txt)(\?|$)/i.test(line)) continue;
+    return resolveStreamUrl(baseUrl, line);
+  }
+  return '';
+}
+function metaFromPlaylistText(text, baseUrl) {
+  const lines = text.replace(/\r/g, '').split('\n');
+  let best = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line.startsWith('#EXT-X-STREAM-INF:')) continue;
+    const attrs = line.slice(line.indexOf(':') + 1);
+    const res = attrValue(attrs, 'RESOLUTION').match(/(\d+)x(\d+)/i);
+    const codecs = attrValue(attrs, 'CODECS');
+    const height = res ? Number(res[2]) : 0;
+    const next = (lines[i + 1] || '').trim();
+    const meta = {
+      codec: codecLabelFromCodecs(codecs),
+      height,
+      nextUrl: next && !next.startsWith('#') ? resolveStreamUrl(baseUrl, next) : ''
+    };
+    if (!best || height > (best.height || 0) || (!best.codec && meta.codec)) best = meta;
+  }
+  const direct = {
+    codec: codecLabelFromCodecs(attrValue(text, 'CODECS')),
+    height: 0,
+    nextUrl: '',
+    segmentUrl: firstMediaSegmentUrl(text, baseUrl)
+  };
+  return betterMeta(best, direct);
+}
+function mergeStreamMeta(meta) {
+  if (!meta || (!meta.codec && !meta.height)) return;
+  streamManifestMeta = betterMeta(streamManifestMeta, meta);
+  updateStreamMeta();
+}
+async function fetchTextWithTimeout(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) return '';
+    return await res.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function parseTsCodec(buffer) {
+  const data = new Uint8Array(buffer);
+  let sync = -1;
+  for (let i = 0; i < 188; i++) {
+    if (data[i] === 0x47 && data[i + 188] === 0x47 && data[i + 376] === 0x47) { sync = i; break; }
+  }
+  if (sync < 0) return '';
+  let pmtPid = -1;
+  const readPayload = (off) => {
+    const start = (data[off + 1] & 0x40) !== 0;
+    const afc = (data[off + 3] >> 4) & 3;
+    let p = off + 4;
+    if (afc === 2 || afc === 3) p += 1 + data[p];
+    if (p >= off + 188) return null;
+    if (start) p += 1 + data[p];
+    return p < off + 188 ? p : null;
+  };
+  for (let off = sync; off + 188 <= data.length; off += 188) {
+    if (data[off] !== 0x47) continue;
+    const pid = ((data[off + 1] & 0x1f) << 8) | data[off + 2];
+    const p = readPayload(off);
+    if (p == null) continue;
+    if (pid === 0 && data[p] === 0x00) {
+      const end = p + 3 + (((data[p + 1] & 0x0f) << 8) | data[p + 2]) - 4;
+      for (let q = p + 8; q + 4 <= end; q += 4) {
+        const program = (data[q] << 8) | data[q + 1];
+        if (program) { pmtPid = ((data[q + 2] & 0x1f) << 8) | data[q + 3]; break; }
+      }
+    } else if (pid === pmtPid && data[p] === 0x02) {
+      const sectionLen = ((data[p + 1] & 0x0f) << 8) | data[p + 2];
+      const programInfoLen = ((data[p + 10] & 0x0f) << 8) | data[p + 11];
+      const end = p + 3 + sectionLen - 4;
+      for (let q = p + 12 + programInfoLen; q + 5 <= end; ) {
+        const type = data[q];
+        if (type === 0x24) return 'h265';
+        if (type === 0x1b) return 'h264';
+        if (type === 0x02) return 'mpeg2';
+        const esInfoLen = ((data[q + 3] & 0x0f) << 8) | data[q + 4];
+        q += 5 + esInfoLen;
+      }
+    }
+  }
+  return '';
+}
+async function fetchSegmentCodec(url) {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
+    const res = await fetch(url, { headers: { Range: 'bytes=0-262143' }, signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!res.ok) return '';
+    return parseTsCodec(await res.arrayBuffer());
+  } catch(e) { return ''; }
+}
+async function fetchHlsStreamMeta(url) {
+  try {
+    const cleanUrl = url.replace(/[\s\/]+$/, '');
+    const firstText = await fetchTextWithTimeout(cleanUrl);
+    if (!firstText) return null;
+    const firstMeta = metaFromPlaylistText(firstText, cleanUrl);
+    let meta = firstMeta;
+    if (firstMeta && firstMeta.nextUrl && (!firstMeta.codec || !firstMeta.height)) {
+      const childText = await fetchTextWithTimeout(firstMeta.nextUrl);
+      if (childText) meta = betterMeta(firstMeta, metaFromPlaylistText(childText, firstMeta.nextUrl));
+    }
+    if (meta && !meta.codec && meta.segmentUrl) {
+      meta = betterMeta(meta, { codec: await fetchSegmentCodec(meta.segmentUrl), height: 0 });
+    }
+    return meta;
+  } catch(e) { return null; }
+}
+let epgData = {};        // channelId -> [{start,stop,title,desc}]
+let epgChMap = {};       // channelId -> display name (from XMLTV)
+let epgLoaded = false;
+
+// ═══ DOM ═════════════════════════════════════
+const video       = document.getElementById('video');
+const placeholder = document.getElementById('placeholder');
+const channelList = document.getElementById('channelList');
+const groupTabs   = document.getElementById('groupTabs');
+const chCount     = document.getElementById('chCount');
+const searchInput = document.getElementById('searchInput'); // 非表示だがDOM残存
+const errorBar    = document.getElementById('errorBar');
+const infoBar     = document.getElementById('infoBar');
+const nowCh       = document.getElementById('nowCh');
+const nowProg     = document.getElementById('nowProg');
+const nowTime     = document.getElementById('nowTime');
+const nowDesc     = document.getElementById('nowDesc');
+const progFill    = document.getElementById('progFill');
+const nextProg    = document.getElementById('nextProg');
+const statusDot   = document.getElementById('statusDot');
+const statusText  = document.getElementById('statusText');
+const streamMeta  = document.getElementById('streamMeta');
+const liveDot     = document.getElementById('liveDot');
+const epgPanel    = document.getElementById('epgPanel');
+const epgBadge    = document.getElementById('epgBadge');
+const epgTooltip  = document.getElementById('epgTooltip');
+const vlcBtn      = document.getElementById('vlcBtn');
+
+// ═══ VLC ══════════════════════════════════════
+function openInVlc() {
+  const ch = allChannels[activeIndex]; if(!ch) return;
+  const url = ch.url.replace(/[\s\/]+$/, '');
+  // HTML側の再生を停止してから VLC を起動
+  if (mainRecoveryCleanup) { mainRecoveryCleanup(); mainRecoveryCleanup = null; }
+  if (shakaPlayer) { shakaPlayer.destroy(); shakaPlayer = null; }
+  destroyHlsFallback();
+  video.pause();
+  video.src = '';
+  video.load();
+  clearStreamMeta();
+  setStatus('VLC再生中', false);
+  window.location.href = 'vlcplay://' + encodeURIComponent(url);
+}
+function showVlcBtn() { vlcBtn.classList.add('show'); }
+function hideVlcBtn() { vlcBtn.classList.remove('show'); }
+
+// ═══ MUTE ═════════════════════════════════════
+function toggleMute() {
+  const btn = document.getElementById('muteBtn');
+  const multiVisible = document.getElementById('view-multi').classList.contains('active');
+
+  if (multiVisible) {
+    // マルチ画面：アクティブ音声セルをミュート切替
+    const mc = multiCells[multiActive];
+    if (mc && mc.video) {
+      mc.video.muted = !mc.video.muted;
+      btn.classList.toggle('muted', mc.video.muted);
+      btn.textContent = mc.video.muted ? '🔇' : '🔊';
+    }
+  } else {
+    // 1画面
+    video.muted = !video.muted;
+    btn.classList.toggle('muted', video.muted);
+    btn.textContent = video.muted ? '🔇' : '🔊';
+  }
+}
+
+// ═══ VIEW ════════════════════════════════════
+function switchView(name) {
+  // マルチ画面から離れる時はストリームを全停止
+  if (document.getElementById('view-multi').classList.contains('active') && name !== 'multi') {
+    for (let i = 0; i < multiCells.length; i++) destroyMultiCell(i);
+  }
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.htab').forEach(t => t.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.getElementById('htab-' + name).classList.add('active');
+  if (name === 'epg') renderEpgGrid();
+  if (name === 'multi') { clearStreamMeta(); buildMultiGrid(); }
+  if (name === 'player') updateStreamMeta();
+}
+
+// ═══ M3U PARSER ══════════════════════════════
+function parseM3U(text) {
+  const lines = text.replace(/\r/g,'').split('\n');
+  const chs = [];
+  let cur = null;
+  for (const line of lines) {
+    const l = line.trim();
+    if (!l) continue;
+    if (l.startsWith('#EXTINF:')) {
+      cur = { name:'', group:'その他', subGroup:'', logo:'', url:'', tvgId:'', tvgName:'' };
+      const ci = l.lastIndexOf(',');
+      if (ci !== -1) cur.name = l.slice(ci+1).trim();
+      const attr = l.slice(8, ci !== -1 ? ci : undefined);
+      const m = re => { const r = attr.match(re); return r ? r[1] : ''; };
+      const tn = m(/tvg-name="([^"]*)"/);
+      if (tn) cur.name = tn;
+      cur.tvgId   = m(/tvg-id="([^"]*)"/);
+      cur.tvgName = cur.name;
+      cur.logo    = m(/tvg-logo="([^"]*)"/);
+      const rawGroup = m(/group-title="([^"]*)"/) || 'その他';
+      // / または | で階層分割（最初の区切りで第1/第2に分割、それ以降は第2に含める）
+      const sep = rawGroup.includes('/') ? '/' : rawGroup.includes('|') ? '|' : null;
+      if (sep) {
+        const idx = rawGroup.indexOf(sep);
+        cur.group    = rawGroup.slice(0, idx).trim() || 'その他';
+        cur.subGroup = rawGroup.slice(idx + 1).trim();
+      } else {
+        cur.group    = rawGroup;
+        cur.subGroup = '';
+      }
+    } else if (!l.startsWith('#') && cur) {
+      cur.url = l.replace(/[\s\/]+$/, ''); chs.push(cur); cur = null;
+    }
+  }
+  return chs;
+}
+
+// ═══ XMLTV PARSER ════════════════════════════
+function parseXMLTV(xml) {
+  const doc = new DOMParser().parseFromString(xml, 'text/xml');
+  if (doc.querySelector('parsererror')) throw new Error('XML解析エラー');
+  const chMap = {};
+  doc.querySelectorAll('channel').forEach(ch => {
+    const id = ch.getAttribute('id');
+    const dn = ch.querySelector('display-name');
+    if (id) chMap[id] = dn ? dn.textContent.trim() : id;
+  });
+  const data = {};
+  doc.querySelectorAll('programme').forEach(p => {
+    const ch    = p.getAttribute('channel');
+    const start = parseXMLDate(p.getAttribute('start'));
+    const stop  = parseXMLDate(p.getAttribute('stop'));
+    const title = (p.querySelector('title')||{}).textContent||'不明';
+    const desc  = (p.querySelector('desc') ||{}).textContent||'';
+    if (!ch || !start) return;
+    if (!data[ch]) data[ch] = [];
+    data[ch].push({ start, stop, title: title.trim(), desc: desc.trim() });
+  });
+  for (const k of Object.keys(data)) data[k].sort((a,b) => a.start-b.start);
+  return { data, chMap };
+}
+function parseXMLDate(s) {
+  if (!s) return null;
+  const m = s.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s*([+-]\d{4})?/);
+  if (!m) return null;
+  const [,Y,Mo,D,H,Mi,S,tz] = m;
+  let off = 0;
+  if (tz) { const sg = tz[0]==='+'?1:-1; off = sg*(parseInt(tz.slice(1,3))*60+parseInt(tz.slice(3,5))); }
+  return new Date(Date.UTC(+Y,+Mo-1,+D,+H,+Mi,+S) - off*60000);
+}
+
+// ═══ URL MEMORY ═════════════════════════════
+function urlInputId(prefix, slot) { return prefix + 'Url' + (slot === 1 ? '' : slot); }
+function urlInputValue(prefix, slot) {
+  const input = document.getElementById(urlInputId(prefix, slot));
+  return input ? input.value.trim() : '';
+}
+function saveUrlInputs(prefix, max, listKey, legacyKey) {
+  const values = [];
+  for (let i = 1; i <= max; i++) values.push(urlInputValue(prefix, i));
+  localStorage.setItem(listKey, JSON.stringify(values));
+  if (values[0]) localStorage.setItem(legacyKey, values[0]);
+}
+function restoreUrlInputs(prefix, max, listKey, legacyKey) {
+  let values = [];
+  try { values = JSON.parse(localStorage.getItem(listKey) || '[]'); } catch(e) { values = []; }
+  const legacy = localStorage.getItem(legacyKey);
+  if (!values.length && legacy) values = [legacy];
+  for (let i = 1; i <= max; i++) {
+    const input = document.getElementById(urlInputId(prefix, i));
+    if (input && values[i - 1]) input.value = values[i - 1];
+  }
+}
+
+async function fetchTextForImport(url, label) {
+  const enc = encodeURIComponent(url);
+  const attempts = [
+    { name: 'direct',       url },
+    { name: 'corsproxy.io', url: 'https://corsproxy.io/?' + enc },
+    { name: 'allorigins',   url: 'https://api.allorigins.win/raw?url=' + enc },
+    { name: 'codetabs',     url: 'https://api.codetabs.com/v1/proxy?quest=' + enc },
+    { name: 'thingproxy',  url: 'https://thingproxy.freeboard.io/fetch/' + url },
+  ];
+  let lastError = null;
+  for (let i = 0; i < attempts.length; i++) {
+    const a = attempts[i];
+    if (i > 0) setStatus(label + '取得中... (' + a.name + ')', false);
+    try {
+      const r = await fetch(a.url, { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const text = await r.text();
+      if (!text.trim()) throw new Error('空のレスポンス');
+      // alloriginsはJSONで返す場合があるので対処
+      if (text.startsWith('{"contents"')) {
+        const json = JSON.parse(text);
+        if (json.contents) return json.contents;
+      }
+      return text;
+    } catch(e) {
+      lastError = e;
+    }
+  }
+  throw lastError || new Error('取得できませんでした');
+}
+
+// ═══ M3U LOADERS ═════════════════════════════
+function handleM3UFile(e) { const f=e.target.files[0]; if(f) readText(f, processM3U); }
+function loadM3UFromText() { const t=document.getElementById('m3uPaste').value.trim(); if(!t)return alert('テキストを入力してください'); processM3U(t); }
+async function loadM3UFromUrl(slot = 1) {
+  const url=urlInputValue('m3u', slot); if(!url)return alert('URLを入力してください');
+  saveUrlInputs('m3u', 5, 'iptv_m3u_urls', 'iptv_m3u_url');
+  setStatus('取得中...', false);
+  try { processM3U(await fetchTextForImport(url, 'M3U')); localStorage.setItem('iptv_m3u_url', url); }
+  catch(e) { showError('取得失敗: '+e.message); setStatus('エラー',false); }
+}
+function processM3U(text) {
+  const chs = parseM3U(text);
+  if (!chs.length) { showError('チャンネルが見つかりませんでした'); return; }
+  allChannels = chs;
+  buildUI(); hideError();
+  setStatus(chs.length+' ch 読込済', false);
+  switchView('player');
+}
+function resetM3U() {
+  stopAll();
+  allChannels = []; filteredChannels = []; activeGroup = ''; activeSubGroup = '';
+  groupTabs.innerHTML = ''; subGroupTabs.innerHTML = ''; subGroupTabs.classList.remove('show');
+  chCount.textContent = '0 ch';
+  channelList.innerHTML = '<div class="empty-state"><div class="icon">📺</div><p>M3U8プレイリストを<br>読み込んでください</p></div>';
+  document.getElementById('m3uPaste').value = '';
+  document.getElementById('m3uFile').value = '';
+  if (searchInput) searchInput.value = '';
+  setStatus('プレイリスト リセット', false);
+}
+
+// ═══ EPG LOADERS ═════════════════════════════
+function handleEPGFile(e) { const f=e.target.files[0]; if(f) readText(f, processEPG); }
+function loadEPGFromText() { const t=document.getElementById('epgPaste').value.trim(); if(!t)return alert('XMLを入力してください'); processEPG(t); }
+async function loadEPGFromUrl(slot = 1) {
+  const url=urlInputValue('epg', slot); if(!url)return alert('URLを入力してください');
+  saveUrlInputs('epg', 3, 'iptv_epg_urls', 'iptv_epg_url');
+  setStatus('EPG取得中...', false);
+  try { processEPG(await fetchTextForImport(url, 'EPG')); localStorage.setItem('iptv_epg_url', url); }
+  catch(e) { showError('EPG取得失敗: '+e.message); setStatus('エラー',false); }
+}
+function processEPG(xml) {
+  try {
+    const { data, chMap } = parseXMLTV(xml);
+    epgData = data; epgChMap = chMap; epgLoaded = true;
+    const total = Object.values(data).reduce((s,a)=>s+a.length,0);
+    epgBadge.style.display = 'inline-flex';
+    epgBadge.textContent = `📡 EPG: ${total}番組`;
+    setStatus('EPG読込完了', false);
+    renderChannels();
+    if (activeIndex >= 0) { updateNowPlaying(allChannels[activeIndex]); renderSchedule(activeIndex); }
+    if (document.getElementById('view-epg').classList.contains('active')) renderEpgGrid();
+  } catch(e) { showError('EPG解析エラー: '+e.message); }
+}
+function resetEPG() {
+  epgData = {}; epgChMap = {}; epgLoaded = false;
+  epgBadge.style.display = 'none'; epgBadge.textContent = '';
+  document.getElementById('epgPaste').value = '';
+  document.getElementById('epgFile').value = '';
+  updateNowPlaying(allChannels[activeIndex] || {});
+  epgPanel.innerHTML = '<div class="no-epg-msg">チャンネルを選択すると番組表が表示されます</div>';
+  renderChannels();
+  if (document.getElementById('view-epg').classList.contains('active')) renderEpgGrid();
+  setStatus('EPG リセット', false);
+}
+
+// ═══ EPG MATCH ════════════════════════════════
+function epgIdFor(ch) {
+  if (ch.tvgId && epgData[ch.tvgId]) return ch.tvgId;
+  for (const [id, name] of Object.entries(epgChMap)) {
+    if (name.toLowerCase() === ch.name.toLowerCase()) { if(epgData[id]) return id; }
+  }
+  for (const [id, name] of Object.entries(epgChMap)) {
+    const a=ch.name.toLowerCase(), b=name.toLowerCase();
+    if (a.includes(b)||b.includes(a)) { if(epgData[id]) return id; }
+  }
+  return null;
+}
+function curProg(ch) {
+  const id=epgIdFor(ch); if(!id) return null;
+  const now=new Date();
+  return (epgData[id]||[]).find(p=>p.start<=now&&p.stop>now)||null;
+}
+function nxtProg(ch) {
+  const id=epgIdFor(ch); if(!id) return null;
+  const now=new Date();
+  return (epgData[id]||[]).find(p=>p.start>now)||null;
+}
+
+// ═══ UI ══════════════════════════════════════
+const subGroupTabs = document.getElementById('subGroupTabs');
+
+function buildUI() {
+  chCount.textContent = allChannels.length+' ch';
+  const groups = [...new Set(allChannels.map(c=>c.group))];
+  if (!groups.includes(activeGroup)) { activeGroup = groups[0] || ''; activeSubGroup = ''; }
+  groupTabs.innerHTML = groups.map(g=>
+    `<div class="group-tab${g===activeGroup?' active':''}" onclick="selectGroup(this,'${escH(g)}')">${escH(g)}</div>`
+  ).join('');
+  renderSubGroups();
+  filterChannels();
+}
+
+function renderSubGroups() {
+  // 現在の第1階層グループの第2階層を取得
+  const subs = [...new Set(
+    allChannels.filter(c => c.group === activeGroup && c.subGroup).map(c => c.subGroup)
+  )];
+  if (!subs.length) {
+    subGroupTabs.innerHTML = '';
+    subGroupTabs.classList.remove('show');
+    activeSubGroup = '';
+    return;
+  }
+  // activeSubGroupが存在するか確認、なければ最初を選択
+  if (!subs.includes(activeSubGroup)) activeSubGroup = subs[0];
+  subGroupTabs.innerHTML = subs.map(s=>
+    `<div class="sub-group-tab${s===activeSubGroup?' active':''}" onclick="selectSubGroup(this,'${escH(s)}')">${escH(s)}</div>`
+  ).join('');
+  subGroupTabs.classList.add('show');
+}
+
+function selectGroup(el, g) {
+  activeGroup = g;
+  activeSubGroup = '';
+  document.querySelectorAll('.group-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderSubGroups();
+  filterChannels();
+}
+
+function selectSubGroup(el, s) {
+  activeSubGroup = s;
+  document.querySelectorAll('.sub-group-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  filterChannels();
+}
+
+function filterChannels() {
+  filteredChannels = allChannels.filter(c => {
+    if (c.group !== activeGroup) return false;
+    // サブグループタブが表示されている場合はサブグループでも絞り込み
+    const hasSubs = subGroupTabs.classList.contains('show');
+    if (hasSubs) return c.subGroup === activeSubGroup;
+    return true;
+  });
+  renderChannels();
+}
+function renderChannels() {
+  if (!filteredChannels.length) {
+    channelList.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>チャンネルが見つかりません</p></div>';
+    return;
+  }
+  channelList.innerHTML = filteredChannels.map(c=>{
+    const idx = allChannels.indexOf(c);
+    const act = idx===activeIndex;
+    const logo = c.logo
+      ? `<img class="ch-logo" src="${escH(c.logo)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/><div class="ch-logo-placeholder" style="display:none">${abb(c.name)}</div>`
+      : `<div class="ch-logo-placeholder">${abb(c.name)}</div>`;
+    let epgMini = c.subGroup ? c.subGroup : c.group, epgCls = '';
+    if (epgLoaded) { const p=curProg(c); if(p){epgMini=p.title;epgCls='has-prog';} }
+    return `<div class="channel-item${act?' active':''}" onclick="handleChannelClick(${idx})">
+      ${logo}
+      <div class="ch-info">
+        <div class="ch-name">${escH(c.name)}</div>
+        <div class="ch-epg-mini ${epgCls}">${escH(epgMini)}</div>
+      </div>
+      <div class="ch-num">${String(idx+1).padStart(3,'0')}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══ PLAYBACK ═════════════════════════════════
+async function playChannel(idx) {
+  const ch = allChannels[idx]; if(!ch) return;
+  activeIndex = idx;
+  renderChannels();
+  placeholder.style.display='none'; video.style.display='block';
+  infoBar.classList.add('show'); liveDot.style.display='inline-block';
+  nowCh.textContent = ch.name;
+  hideError(); clearStreamMeta(); setStatus('接続中...', false);
+  showVlcBtn();
+  // ミュートボタンをリセット
+  video.muted = false;
+  const muteBtn = document.getElementById('muteBtn');
+  if (muteBtn) { muteBtn.textContent = '🔊'; muteBtn.classList.remove('muted'); }
+  updateNowPlaying(ch); renderSchedule(idx);
+  switchView('player');
+
+  if (mainRecoveryCleanup) { mainRecoveryCleanup(); mainRecoveryCleanup = null; }
+  if (shakaPlayer) { await shakaPlayer.destroy(); shakaPlayer = null; }
+  destroyHlsFallback();
+  const initialMeta = await fetchHlsStreamMeta(ch.url);
+  if (activeIndex !== idx) return;
+  if (initialMeta) mergeStreamMeta(initialMeta);
+  if (preferHlsJsForMeta(initialMeta) && await startMainHlsJsFallback(idx, ch, 'prefer-h264')) return;
+
+  shaka.polyfill.installAll();
+  if (shaka.Player.isBrowserSupported()) {
+    shakaPlayer = new shaka.Player(video);
+    shakaPlayer.configure(shakaLiveConfig(12));
+    const net = shakaPlayer.getNetworkingEngine && shakaPlayer.getNetworkingEngine();
+    if (net && typeof net.registerResponseFilter === 'function') {
+      net.registerResponseFilter((type, response) => {
+        try {
+          if (!response || !response.data) return;
+          const body = new TextDecoder('utf-8').decode(response.data);
+          if (body.includes('#EXTM3U')) mergeStreamMeta(metaFromPlaylistText(body, response.uri || ch.url));
+        } catch(e) {}
+      });
+    }
+    shakaPlayer.addEventListener('error', (e) => {
+      const err = e.detail;
+      mergeStreamMeta(metaFromShakaManifest());
+      updateStreamMeta();
+      if (shakaFallbackError(err)) {
+        startMainHlsJsFallback(idx, ch, err.message || err.code);
+        return;
+      }
+      showError('ストリームエラー: ' + (err.message || err.code));
+      setStatus('エラー', false);
+      liveDot.style.display = 'none';
+    });
+    shakaPlayer.addEventListener('trackschanged', updateStreamMeta);
+    shakaPlayer.addEventListener('variantchanged', updateStreamMeta);
+    try {
+      await loadAsHls(shakaPlayer, ch.url);
+      mergeStreamMeta(metaFromShakaManifest());
+      mainRecoveryCleanup = attachShakaRecovery(
+        shakaPlayer,
+        video,
+        ch.url,
+        () => activeIndex === idx && shakaPlayer,
+        null,
+        () => { mergeStreamMeta(metaFromShakaManifest()); updateStreamMeta(); setStatus('再生中', true); }
+      );
+      await video.play();
+      updateStreamMeta();
+      setStatus('再生中', true);
+    } catch(e) {
+      mergeStreamMeta(metaFromShakaManifest());
+      updateStreamMeta();
+      if (shakaFallbackError(e) && await startMainHlsJsFallback(idx, ch, e.message || e.code)) return;
+      showError('再生できません: ' + (e.message || e.code || '不明'));
+      setStatus('エラー', false);
+      liveDot.style.display = 'none';
+    }
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = ch.url.replace(/[\s\/]+$/, '');
+    video.addEventListener('loadedmetadata',()=>{ video.play().catch(()=>{}); updateStreamMeta(); setStatus('再生中',true); },{once:true});
+  } else {
+    showError('このブラウザはサポートされていません'); clearStreamMeta(); setStatus('非対応',false);
+  }
+}
+
+// チャンネルクリック：マルチ表示中は割り当て、それ以外は通常再生
+function handleChannelClick(idx) {
+  if (document.getElementById('view-multi').classList.contains('active')) {
+    assignChannelToMulti(idx);
+  } else {
+    playChannel(idx);
+  }
+}
+
+function updateNowPlaying(ch) {
+  if (!epgLoaded) { nowProg.textContent='—'; nowTime.textContent=''; nowDesc.textContent=''; nextProg.textContent=''; progFill.style.width='0%'; return; }
+  const cur=curProg(ch), nxt=nxtProg(ch);
+  if (cur) {
+    nowProg.textContent=cur.title;
+    nowTime.textContent=fmt(cur.start)+' – '+fmt(cur.stop);
+    nowDesc.textContent=cur.desc;
+    progFill.style.width=Math.min(100,((Date.now()-cur.start)/(cur.stop-cur.start))*100).toFixed(1)+'%';
+  } else { nowProg.textContent='—'; nowTime.textContent=''; nowDesc.textContent=''; progFill.style.width='0%'; }
+  nextProg.innerHTML = nxt ? `次: <span>${escH(nxt.title)}</span> ${fmt(nxt.start)}〜` : '';
+}
+
+// ═══ SCHEDULE (player bottom) ════════════════
+function renderSchedule(idx) {
+  const ch = allChannels[idx]; if(!ch) return;
+  const id = epgLoaded ? epgIdFor(ch) : null;
+  if (!id || !epgData[id]) { epgPanel.innerHTML='<div class="no-epg-msg">このチャンネルのEPGデータはありません</div>'; return; }
+  const progs = epgData[id];
+  const now = new Date();
+  const ds = new Date(now); ds.setHours(0,0,0,0);
+  const de = new Date(now); de.setHours(23,59,59,999);
+  const today = progs.filter(p=>p.stop>ds&&p.start<de);
+  let html = `<div class="epg-section-title">本日の番組表 — ${escH(ch.name)}</div>`;
+  if (!today.length) { html += '<div class="no-epg-msg">本日の番組データがありません</div>'; }
+  else html += today.map(p=>{
+    const isNow=p.start<=now&&p.stop>now, isPast=p.stop<=now;
+    const dur=Math.round((p.stop-p.start)/60000);
+    return `<div class="prog-item ${isNow?'now':isPast?'past':''}">
+      <div class="pt">${fmt(p.start)}</div>
+      <div class="pi">
+        <div class="pi-title">${escH(p.title)}${isNow?'<span class="now-badge">NOW</span>':''}</div>
+        <div class="pi-dur">${dur}分</div>
+        ${p.desc?`<div class="pi-desc">${escH(p.desc)}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  epgPanel.innerHTML = html;
+  const nowEl = epgPanel.querySelector('.prog-item.now');
+  if (nowEl) nowEl.scrollIntoView({block:'center',behavior:'smooth'});
+}
+
+// ═══ EPG GRID ═════════════════════════════════
+const SLOT_PX = 120; // px per 30 min
+function renderEpgGrid() {
+  const body   = document.getElementById('epgGridBody');
+  const picker = document.getElementById('epgDatePicker');
+  const info   = document.getElementById('epgGridInfo');
+
+  if (!epgLoaded || !Object.keys(epgData).length) {
+    body.innerHTML='<div class="epg-empty2"><div class="icon">📅</div><p>EPGデータを読み込んでください</p></div>';
+    info.textContent=''; return;
+  }
+  if (!picker.value) {
+    const t=new Date();
+    picker.value=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+  }
+  const [Y,Mo,D] = picker.value.split('-').map(Number);
+  const dayStart = new Date(Y,Mo-1,D,0,0,0);
+  const dayEnd   = new Date(Y,Mo-1,D,23,59,59,999);
+  const totalMin = 24*60;
+  const totalW   = (totalMin/30)*SLOT_PX;
+  const now = new Date();
+
+  const rows = allChannels.map(ch=>{
+    const id = epgIdFor(ch); if(!id) return null;
+    const progs = (epgData[id]||[]).filter(p=>p.stop>dayStart&&p.start<dayEnd);
+    return {ch,progs};
+  }).filter(Boolean);
+
+  if (!rows.length) {
+    body.innerHTML='<div class="epg-empty2"><div class="icon">📭</div><p>この日の番組データがありません</p></div>';
+    info.textContent=''; return;
+  }
+  info.textContent=`${rows.length} ch`;
+
+  const nowLineLeft = (now>=dayStart&&now<=dayEnd)
+    ? Math.round((now-dayStart)/(dayEnd-dayStart)*totalW) : -1;
+
+  // ── Left pane: fixed channel list ──
+  let leftHtml = `<div class="epg-left-header">チャンネル</div><div class="epg-left-rows" id="epgLeftRows">`;
+  leftHtml += rows.map(({ch})=>{
+    const cidx = allChannels.indexOf(ch);
+    const logoH = ch.logo ? `<img class="mini-logo" src="${escH(ch.logo)}" onerror="this.style.display='none'"/>` : '';
+    return `<div class="epg-left-cell">
+      ${logoH}<div class="mini-name" onclick="handleChannelClick(${cidx})">${escH(ch.name)}</div>
+    </div>`;
+  }).join('');
+  leftHtml += '</div>';
+
+  // ── Right pane: scrollable timeline ──
+  let timeHeader = `<div class="epg-header-row" style="width:${totalW}px;position:sticky;top:0">`;
+  for(let h=0;h<24;h++) timeHeader+=`<div class="epg-header-slot" style="width:${SLOT_PX*2}px">${String(h).padStart(2,'0')}:00</div>`;
+  timeHeader+='</div>';
+
+  let rightRows = rows.map(({ch,progs})=>{
+    let tl=`<div class="epg-timeline" style="width:${totalW}px">`;
+    if(nowLineLeft>=0) tl+=`<div class="now-line" style="left:${nowLineLeft}px"></div>`;
+    progs.forEach(p=>{
+      const s=Math.max(p.start.getTime(),dayStart.getTime());
+      const e=Math.min(p.stop?p.stop.getTime():dayEnd.getTime(),dayEnd.getTime());
+      const left=Math.round((s-dayStart)/60000/totalMin*totalW);
+      const width=Math.max(2,Math.round((e-s)/60000/totalMin*totalW)-1);
+      const isNow=p.start<=now&&p.stop>now, isPast=p.stop<=now;
+      tl+=`<div class="epg-block ${isNow?'now':isPast?'past':''}"
+        style="left:${left}px;width:${width}px"
+        data-title="${escH(p.title)}" data-time="${escH(fmt(p.start)+'–'+fmt(p.stop))}" data-desc="${escH(p.desc)}"
+        onmouseenter="showTip(event)" onmouseleave="hideTip()">
+        <div class="epg-block-title">${escH(p.title)}</div>
+        <div class="epg-block-time">${fmt(p.start)}</div>
+      </div>`;
+    });
+    tl+='</div>';
+    return `<div class="epg-row">${tl}</div>`;
+  }).join('');
+
+  // Build DOM
+  body.innerHTML = `
+    <div class="epg-left" id="epgLeft">${leftHtml}</div>
+    <div class="epg-right" id="epgRight">${timeHeader}${rightRows}</div>`;
+
+  // Sync vertical scroll: right → left-rows
+  const epgRight    = document.getElementById('epgRight');
+  const epgLeftRows = document.getElementById('epgLeftRows');
+  epgRight.addEventListener('scroll', () => {
+    epgLeftRows.scrollTop = epgRight.scrollTop;
+  });
+
+  // Auto-scroll to now
+  if(nowLineLeft>=0) setTimeout(()=>{ epgRight.scrollLeft=Math.max(0,nowLineLeft-200); },50);
+}
+
+// ═══ TOOLTIP ══════════════════════════════════
+function showTip(e) {
+  const el=e.currentTarget;
+  document.getElementById('ttTitle').textContent=el.dataset.title;
+  document.getElementById('ttTime').textContent=el.dataset.time;
+  document.getElementById('ttDesc').textContent=el.dataset.desc;
+  epgTooltip.classList.add('show'); moveTip(e);
+}
+function moveTip(e) {
+  epgTooltip.style.left=Math.min(e.clientX+14,window.innerWidth-280)+'px';
+  epgTooltip.style.top =Math.min(e.clientY+14,window.innerHeight-130)+'px';
+}
+function hideTip() { epgTooltip.classList.remove('show'); }
+document.addEventListener('mousemove',e=>{ if(epgTooltip.classList.contains('show')) moveTip(e); });
+
+// ═══ HELPERS ══════════════════════════════════
+function fmt(d) { if(!d)return''; return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function abb(n) { return n.trim().slice(0,3).toUpperCase(); }
+function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function showError(m) { errorBar.textContent='⚠ '+m; errorBar.classList.add('show'); }
+function hideError()  { errorBar.classList.remove('show'); }
+function setStatus(m,live) { statusText.textContent=m; statusDot.className='dot'+(live?' live':''); }
+function codecLabelFromCodecs(codecs) {
+  if (!codecs) return '';
+  const raw = String(codecs).toLowerCase().split(',').map(c => c.trim()).filter(Boolean);
+  const c = raw.find(x => /^(avc1|avc3|hev1|hvc1|vp09|vp9|vp08|vp8|av01|mp4v)/.test(x)) || raw[0] || '';
+  if (/^(avc1|avc3)/.test(c)) return 'h264';
+  if (/^(hev1|hvc1)/.test(c)) return 'h265';
+  if (/^(vp09|vp9)/.test(c)) return 'vp9';
+  if (/^(vp08|vp8)/.test(c)) return 'vp8';
+  if (/^av01/.test(c)) return 'av1';
+  if (/^mp4v/.test(c)) return 'mpeg4';
+  return c.split('.')[0];
+}
+function metaFromShakaManifest() {
+  try {
+    if (!shakaPlayer || typeof shakaPlayer.getManifest !== 'function') return null;
+    const manifest = shakaPlayer.getManifest();
+    if (!manifest || !manifest.variants) return null;
+    let best = null;
+    for (const variant of manifest.variants) {
+      const v = variant.video || {};
+      const codec = v.codecs || v.codec || variant.videoCodec || variant.codecs || '';
+      const height = v.height || variant.height || 0;
+      best = betterMeta(best, { codec: codecLabelFromCodecs(codec), height });
+    }
+    return best;
+  } catch(e) { return null; }
+}
+function currentStreamMeta() {
+  let meta = streamManifestMeta || null;
+  try {
+    if (shakaPlayer && typeof shakaPlayer.getVariantTracks === 'function') {
+      const tracks = shakaPlayer.getVariantTracks();
+      const sorted = tracks.slice().sort((a,b) => (b.height || 0) - (a.height || 0));
+      const track = tracks.find(t => t.active) || sorted[0];
+      if (track) {
+        meta = betterMeta(meta, {
+          codec: codecLabelFromCodecs(track.videoCodec || track.codecs || track.videoMimeType || track.mimeType || ''),
+          height: track.height || 0
+        });
+      }
+    }
+  } catch(e) {}
+  meta = betterMeta(meta, metaFromShakaManifest());
+  if ((!meta || !meta.height) && video.videoHeight) meta = betterMeta(meta, { codec: '', height: video.videoHeight });
+  return meta ? [codecLabelFromCodecs(meta.codec), meta.height ? meta.height + 'p' : ''].filter(Boolean).join(' ') : '';
+}
+function updateStreamMeta() {
+  if (!streamMeta) return;
+  const isPlayerView = document.getElementById('view-player').classList.contains('active');
+  const isVisibleVideo = video && video.style.display !== 'none' && activeIndex >= 0;
+  streamMeta.textContent = (isPlayerView && isVisibleVideo) ? currentStreamMeta() : '';
+}
+function clearStreamMeta() { streamManifestMeta = null; if (streamMeta) streamMeta.textContent = ''; }
+video.addEventListener('loadedmetadata', updateStreamMeta);
+video.addEventListener('resize', updateStreamMeta);
+video.addEventListener('playing', updateStreamMeta);
+function readText(file,cb) { const r=new FileReader(); r.onload=ev=>cb(ev.target.result); r.readAsText(file,'utf-8'); }
+
+// Drag & Drop
+function onDragOver(e,id) { e.preventDefault(); document.getElementById(id).classList.add('drag-over'); }
+function onDragLeave(id)  { document.getElementById(id).classList.remove('drag-over'); }
+function onDropM3U(e) { e.preventDefault(); onDragLeave('m3uDrop'); const f=e.dataTransfer.files[0]; if(f) readText(f,processM3U); }
+function onDropEPG(e) { e.preventDefault(); onDragLeave('epgDrop'); const f=e.dataTransfer.files[0]; if(f) readText(f,processEPG); }
+
+// Keyboard
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  if(e.key==='ArrowDown'&&activeIndex<allChannels.length-1) playChannel(activeIndex+1);
+  if(e.key==='ArrowUp'&&activeIndex>0) playChannel(activeIndex-1);
+});
+
+// Auto-refresh every 30s
+setInterval(()=>{
+  if(activeIndex>=0&&epgLoaded){ updateNowPlaying(allChannels[activeIndex]); renderChannels(); }
+},30000);
+
+// ═══ STOP ALL ══════════════════════════════════
+function stopAll() {
+  if (mainRecoveryCleanup) { mainRecoveryCleanup(); mainRecoveryCleanup = null; }
+  if (shakaPlayer) { shakaPlayer.destroy(); shakaPlayer = null; }
+  destroyHlsFallback();
+  video.src = ''; video.load();
+  video.style.display = 'none';
+  placeholder.style.display = 'flex';
+  infoBar.classList.remove('show');
+  liveDot.style.display = 'none';
+  hideError(); hideVlcBtn();
+  clearStreamMeta();
+  setStatus('待機中', false);
+  activeIndex = -1;
+  for (let i = 0; i < multiCells.length; i++) destroyMultiCell(i);
+  buildMultiGrid();
+  renderChannels();
+}
+
+// ═══ MULTI VIEW ════════════════════════════════
+const MULTI_MAX = 9;
+let multiLayout = 2;
+let multiCells  = [];
+let multiActive = 0;
+let multiSelectedCell = 0; // ③ 選択セル（次に割り当てる対象）
+
+function setMultiLayout(n) {
+  multiLayout = n;
+  [2,4,6,8,9].forEach(x => {
+    const btn = document.getElementById('mlBtn'+x);
+    if (btn) btn.classList.toggle('active', x===n);
+  });
+  document.getElementById('multiGrid').className = 'multi-grid layout-' + n;
+  for (let i = n; i < MULTI_MAX; i++) destroyMultiCell(i);
+  multiCells = multiCells.slice(0, n);
+  if (multiSelectedCell >= n) multiSelectedCell = 0;
+  if (multiActive >= n) multiActive = 0;
+  buildMultiGrid();
+}
+
+function buildMultiGrid() {
+  const grid = document.getElementById('multiGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < multiLayout; i++) {
+    if (!multiCells[i]) multiCells[i] = { chIdx: null, shakaPlayer: null };
+    const cell = document.createElement('div');
+    cell.className = 'multi-cell'
+      + (i === multiActive ? ' active-audio' : '')
+      + (i === multiSelectedCell ? ' selected-cell' : '');
+
+    const audioIcon = document.createElement('div');
+    audioIcon.className = 'multi-audio-icon';
+    audioIcon.textContent = '🔊';
+    cell.appendChild(audioIcon);
+
+    // セル番号バッジ
+    const numBadge = document.createElement('div');
+    numBadge.className = 'multi-cell-num';
+    numBadge.textContent = i + 1;
+    cell.appendChild(numBadge);
+
+    const epgNow = document.createElement('div');
+    epgNow.className = 'multi-epg-now';
+    cell.appendChild(epgNow);
+
+    const vid = document.createElement('video');
+    vid.autoplay = true;
+    vid.muted = (i !== multiActive);
+    vid.playsInline = true;
+    vid.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block';
+    cell.appendChild(vid);
+    multiCells[i].video = vid;
+
+    const label = document.createElement('div');
+    label.className = 'multi-cell-label';
+    cell.appendChild(label);
+
+    const empty = document.createElement('div');
+    empty.className = 'multi-cell-empty';
+    empty.innerHTML = '<div class="icon">📺</div><div>クリックして選択</div>';
+    cell.appendChild(empty);
+    multiCells[i].emptyEl = empty;
+    multiCells[i].labelEl = label;
+    multiCells[i].epgNowEl = epgNow;
+    multiCells[i].cellEl = cell;
+
+    cell.addEventListener('click', () => {
+      // シングルクリック：選択セルを変更 + 音声切替
+      selectMultiCell(i);
+    });
+    cell.addEventListener('dblclick', () => {
+      const mc = multiCells[i];
+      if (mc.chIdx !== null) {
+        const chIdx = mc.chIdx;
+        for (let j = 0; j < multiCells.length; j++) destroyMultiCell(j);
+        playChannel(chIdx);
+      }
+    });
+
+    grid.appendChild(cell);
+    if (multiCells[i].chIdx !== null) startMultiStream(i, multiCells[i].chIdx);
+  }
+  updateCellHighlights();
+}
+
+function selectMultiCell(cellIdx) {
+  multiSelectedCell = cellIdx;
+  setMultiAudio(cellIdx);
+}
+
+function setMultiAudio(cellIdx) {
+  multiActive = cellIdx;
+  updateCellHighlights();
+}
+
+function updateCellHighlights() {
+  document.querySelectorAll('.multi-cell').forEach((c, i) => {
+    c.classList.toggle('active-audio', i === multiActive);
+    c.classList.toggle('selected-cell', i === multiSelectedCell);
+    if (multiCells[i] && multiCells[i].video) multiCells[i].video.muted = (i !== multiActive);
+  });
+}
+
+function assignChannelToMulti(chIdx) {
+  // ③ 選択セルに直接割り当て
+  const target = multiSelectedCell;
+  destroyMultiCell(target);
+  multiCells[target].chIdx = chIdx;
+  startMultiStream(target, chIdx);
+  // 次のセルを自動選択（空のセルがあれば）
+  const nextEmpty = multiCells.findIndex((c, i) => i !== target && c && c.chIdx === null);
+  if (nextEmpty !== -1) selectMultiCell(nextEmpty);
+}
+
+async function startMultiStream(cellIdx, chIdx) {
+  const mc = multiCells[cellIdx];
+  const ch = allChannels[chIdx];
+  if (!ch || !mc || !mc.video) return;
+  mc.emptyEl.style.display = 'none';
+  mc.labelEl.textContent = ch.name;
+  if (epgLoaded) { const p = curProg(ch); mc.epgNowEl.textContent = p ? p.title : ''; }
+
+  if (mc.recoveryCleanup) { mc.recoveryCleanup(); mc.recoveryCleanup = null; }
+  if (mc.shakaPlayer) { await mc.shakaPlayer.destroy(); mc.shakaPlayer = null; }
+  if (mc.hlsFallback) { mc.hlsFallback.destroy(); mc.hlsFallback = null; }
+
+  const initialMeta = await fetchHlsStreamMeta(ch.url);
+  if (multiCells[cellIdx] !== mc || mc.chIdx !== chIdx) return;
+  if (preferHlsJsForMeta(initialMeta) && startCellHlsJsFallback(mc, cellIdx, chIdx, ch)) {
+    mc.video.muted = (cellIdx !== multiActive);
+    return;
+  }
+
+  shaka.polyfill.installAll();
+  if (shaka.Player.isBrowserSupported()) {
+    const player = new shaka.Player(mc.video);
+    player.configure(shakaLiveConfig(8));
+    player.addEventListener('error', (e) => {
+      if (shakaFallbackError(e.detail)) startCellHlsJsFallback(mc, cellIdx, chIdx, ch);
+      else console.warn('Multi stream error:', e.detail);
+    });
+    mc.shakaPlayer = player;
+    try {
+      await loadAsHls(player, ch.url);
+      mc.recoveryCleanup = attachShakaRecovery(
+        player,
+        mc.video,
+        ch.url,
+        () => multiCells[cellIdx] === mc && mc.chIdx === chIdx && mc.shakaPlayer === player,
+        null,
+        null
+      );
+      mc.video.play().catch(()=>{});
+    } catch(e) {
+      if (!shakaFallbackError(e) || !startCellHlsJsFallback(mc, cellIdx, chIdx, ch)) {
+        console.warn('Multi stream load error:', e);
+      }
+    }
+  } else if (mc.video.canPlayType('application/vnd.apple.mpegurl')) {
+    mc.video.src = ch.url.replace(/[\s\/]+$/, ''); mc.video.play().catch(()=>{});
+  }
+  mc.video.muted = (cellIdx !== multiActive);
+}
+
+function destroyMultiCell(cellIdx) {
+  const mc = multiCells[cellIdx]; if(!mc) return;
+  if (mc.recoveryCleanup) { mc.recoveryCleanup(); mc.recoveryCleanup = null; }
+  if (mc.shakaPlayer) { mc.shakaPlayer.destroy(); mc.shakaPlayer = null; }
+  if (mc.hlsFallback) { mc.hlsFallback.destroy(); mc.hlsFallback = null; }
+  if (mc.video) { mc.video.src = ''; }
+  mc.chIdx = null;
+}
+
+// ═══ NETWORK & BUFFER MONITOR ══════════════════
+(function() {
+  // XHRをフックしてダウンロードバイト数を計測
+  let totalBytes = 0;
+  let lastBytes  = 0;
+  let lastTime   = performance.now();
+
+  const OrigXHR = window.XMLHttpRequest;
+  function HookedXHR() {
+    const xhr = new OrigXHR();
+    xhr.addEventListener('load', function() {
+      try {
+        if (xhr.responseType === 'arraybuffer' && xhr.response) {
+          totalBytes += xhr.response.byteLength;
+        } else if (xhr.responseType === 'text' || xhr.responseType === '') {
+          totalBytes += (xhr.responseText || '').length;
+        } else if (xhr.response) {
+          totalBytes += JSON.stringify(xhr.response).length;
+        }
+      } catch(e) {}
+    });
+    return xhr;
+  }
+  HookedXHR.prototype = OrigXHR.prototype;
+  Object.defineProperty(HookedXHR, 'prototype', { value: OrigXHR.prototype });
+  // XHRの全プロパティを引き継ぐ
+  for (const k of Object.getOwnPropertyNames(OrigXHR)) {
+    try { if (!(k in HookedXHR)) HookedXHR[k] = OrigXHR[k]; } catch(e) {}
+  }
+  window.XMLHttpRequest = HookedXHR;
+
+  // fetchもフック
+  const origFetch = window.fetch;
+  window.fetch = function(...args) {
+    return origFetch.apply(this, args).then(res => {
+      const clone = res.clone();
+      clone.arrayBuffer().then(buf => { totalBytes += buf.byteLength; }).catch(()=>{});
+      return res;
+    });
+  };
+
+  // Shaka Player使用時は XHR/fetch のフックで通信量を計測する
+  window._addHlsBytesHook = function() {};
+
+  setInterval(() => {
+    const mainVid = document.getElementById('video');
+    const ni      = document.getElementById('netIndicator');
+    const netSpeedEl = document.getElementById('netSpeed');
+    const bufBarEl   = document.getElementById('bufBar');
+    const bufSecEl   = document.getElementById('bufSec');
+
+    const mainPlaying  = mainVid && mainVid.style.display !== 'none' && !mainVid.paused;
+    const multiVisible = document.getElementById('view-multi').classList.contains('active');
+    const anyPlaying   = mainPlaying || multiVisible;
+
+    ni.style.display = anyPlaying ? 'flex' : 'none';
+    if (!anyPlaying) { lastBytes = 0; lastTime = performance.now(); return; }
+
+    // 通信速度計算
+    const now     = performance.now();
+    const elapsed = (now - lastTime) / 1000;
+    if (elapsed > 0) {
+      const diff = totalBytes - lastBytes;
+      const kbps = diff / 1024 / elapsed;
+      netSpeedEl.textContent = kbps >= 1024
+        ? (kbps / 1024).toFixed(1) + ' MB/s'
+        : Math.round(kbps) + ' KB/s';
+    }
+    lastBytes = totalBytes;
+    lastTime  = now;
+
+    // バッファ残量
+    try {
+      let vid = null;
+      if (mainPlaying) {
+        vid = mainVid;
+      } else if (multiVisible) {
+        // マルチ画面：音声アクティブなセルのvideoを参照
+        const mc = multiCells[multiActive];
+        if (mc && mc.video && mc.chIdx !== null) vid = mc.video;
+        // アクティブセルに映像がなければ再生中の最初のセルを探す
+        if (!vid) {
+          for (let i = 0; i < multiCells.length; i++) {
+            if (multiCells[i] && multiCells[i].video && multiCells[i].chIdx !== null) {
+              vid = multiCells[i].video; break;
+            }
+          }
+        }
+      }
+      if (!vid || vid.readyState < 2) return;
+      const ranges = vid.buffered;
+      const ct = vid.currentTime;
+      let ahead = 0;
+      for (let i = 0; i < ranges.length; i++) {
+        if (ranges.start(i) <= ct + 0.5 && ranges.end(i) >= ct) {
+          ahead = Math.max(0, ranges.end(i) - ct);
+          break;
+        }
+      }
+      const MAX = 20;
+      const pct = Math.min(100, (ahead / MAX) * 100);
+      bufBarEl.style.width      = pct + '%';
+      bufBarEl.style.background = ahead > 8 ? 'var(--playing)' : ahead > 3 ? 'var(--accent2)' : 'var(--error)';
+      bufSecEl.textContent      = ahead.toFixed(1) + 's';
+    } catch(e) {}
+  }, 1000);
+})();
+
+// ═══ RESTORE SAVED URLs ════════════════════════
+(function() {
+  restoreUrlInputs('m3u', 5, 'iptv_m3u_urls', 'iptv_m3u_url');
+  restoreUrlInputs('epg', 3, 'iptv_epg_urls', 'iptv_epg_url');
+})();
+
+// ═══ THEME ═════════════════════════════════════
+(function() {
+  const btn = document.getElementById('themeBtn');
+  const apply = light => {
+    document.documentElement.classList.toggle('light', light);
+    btn.textContent = light ? '🌙' : '☀️';
+    btn.title = light ? 'ダークモードに切替' : 'ライトモードに切替';
+  };
+  const saved = localStorage.getItem('iptv_theme');
+  apply(saved === 'light');
+  window.toggleTheme = () => {
+    const isLight = document.documentElement.classList.toggle('light');
+    localStorage.setItem('iptv_theme', isLight ? 'light' : 'dark');
+    apply(isLight);
+  };
+})();
+
+// ═══ RESIZERS ══════════════════════════════════
+(function() {
+  // ── Vertical: sidebar width ──
+  const rV       = document.getElementById('resizerV');
+  const sidebar  = document.getElementById('sidebar');
+  const layout   = document.querySelector('.layout');
+  let dragV = false, startX, startW;
+  rV.addEventListener('mousedown', e => {
+    dragV = true; startX = e.clientX; startW = sidebar.offsetWidth;
+    rV.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragV) return;
+    const w = Math.min(Math.max(startW + e.clientX - startX, 160), layout.offsetWidth * 0.5);
+    sidebar.style.width = w + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragV) return;
+    dragV = false; rV.classList.remove('dragging');
+    document.body.style.cursor = ''; document.body.style.userSelect = '';
+  });
+
+  // ── Horizontal: video height vs EPG panel ──
+  const rH       = document.getElementById('resizerH');
+  const videoWrap= document.getElementById('videoWrap');
+  const playerView= document.getElementById('view-player');
+  let dragH = false, startY, startH;
+  rH.addEventListener('mousedown', e => {
+    dragH = true; startY = e.clientY; startH = videoWrap.offsetHeight;
+    rH.classList.add('dragging');
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragH) return;
+    const viewH = playerView.offsetHeight;
+    const h = Math.min(Math.max(startH + e.clientY - startY, 80), viewH - 80);
+    videoWrap.style.height = h + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragH) return;
+    dragH = false; rH.classList.remove('dragging');
+    document.body.style.cursor = ''; document.body.style.userSelect = '';
+  });
+})();
+</script>
+</body>
+</html>
+
+
+
+
+
