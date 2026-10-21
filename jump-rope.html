@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>縄跳びゲーム - Jump Rope Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #121214;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 100vh;
+            max-height: 600px;
+            background: linear-gradient(180deg, #1a1b26 0%, #24283b 60%, #1f2335 100%);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Top HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hud-item {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            color: #7aa2f7;
+            text-shadow: 0 0 8px rgba(122, 162, 247, 0.5);
+        }
+
+        .hud-item span {
+            color: #ffffff;
+        }
+
+        .nav-home {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: auto;
+            text-decoration: none;
+            color: #a9b1d6;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s;
+            z-index: 6;
+        }
+
+        .nav-home:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #7aa2f7;
+        }
+
+        /* Overlay screens */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 15, 24, 0.85);
+            backdrop-filter: blur(6px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: opacity 0.3s ease;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            font-size: 42px;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #7aa2f7, #bb9af7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(122, 162, 247, 0.4);
+        }
+
+        .instructions {
+            font-size: 16px;
+            color: #a9b1d6;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .instructions span {
+            display: inline-block;
+            background: rgba(122, 162, 247, 0.2);
+            color: #7dcfff;
+            padding: 2px 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(124, 207, 255, 0.4);
+            font-weight: bold;
+        }
+
+        .btn {
+            padding: 14px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #7aa2f7, #7dcfff);
+            color: #1a1b26;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(122, 162, 247, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(122, 162, 247, 0.6);
+            background: linear-gradient(135deg, #89b4ff, #8ae0ff);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        #final-score-container {
+            margin-bottom: 24px;
+        }
+
+        .score-val {
+            font-size: 48px;
+            color: #ff9e64;
+            font-weight: bold;
+            text-shadow: 0 0 15px rgba(255, 158, 100, 0.5);
+        }
+
+        .high-score-val {
+            font-size: 18px;
+            color: #9ecd6f;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <a href="index.html" class="nav-home">← ホームに戻る</a>
+
+        <div id="hud">
+            <div style="width: 120px;"></div>
+            <div class="hud-item">SCORE: <span id="score-display">0</span></div>
+            <div class="hud-item">BEST: <span id="high-score-display">0</span></div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Start Overlay -->
+        <div id="start-overlay" class="overlay">
+            <h1>縄跳びゲーム</h1>
+            <p class="instructions">
+                縄が下に来るタイミングに合わせて <span>SPACE</span> キー（または画面タップ）でジャンプ！<br>
+                連続で飛ぶとスピードが徐々に上がっていきます！
+            </p>
+            <button class="btn" id="start-btn">ゲームスタート</button>
+        </div>
+
+        <!-- Game Over Overlay -->
+        <div id="gameover-overlay" class="overlay hidden">
+            <h1>GAME OVER</h1>
+            <div id="final-score-container">
+                <div class="score-val" id="final-score">0 回</div>
+                <div class="high-score-val" id="final-high-score">ハイスコア: 0 回</div>
+            </div>
+            <button class="btn" id="restart-btn">もう一度プレイ</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Web Audio API Controller ---
+        class SoundEffects {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        this.ctx = new AudioContext();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playJump() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+
+                const now = this.ctx.currentTime;
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(450, now + 0.15);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+
+            playScore() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+
+                const now = this.ctx.currentTime;
+                osc.frequency.setValueAtTime(587.33, now); // D5
+                osc.frequency.setValueAtTime(880, now + 0.06); // A5
+
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+
+            playGameOver() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+
+                const now = this.ctx.currentTime;
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(80, now + 0.4);
+
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.4);
+            }
+        }
+
+        // --- Game Setup & Logic ---
+        const sound = new SoundEffects();
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const startOverlay = document.getElementById('start-overlay');
+        const gameoverOverlay = document.getElementById('gameover-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const scoreDisplay = document.getElementById('score-display');
+        const highScoreDisplay = document.getElementById('high-score-display');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const finalHighScoreDisplay = document.getElementById('final-high-score');
+
+        // Assets
+        const imgStanding = new Image();
+        imgStanding.src = 'images/standing.png';
+
+        const imgJumpStart = new Image();
+        imgJumpStart.src = 'images/jump_start.webp';
+
+        const imgJumping = new Image();
+        imgJumping.src = 'images/jumping.webp';
+
+        // High Score
+        let highScore = parseInt(localStorage.getItem('jumpRopeHighScore') || '0', 10);
+        highScoreDisplay.textContent = highScore;
+
+        // Game state
+        let isRunning = false;
+        let score = 0;
+
+        // Physics & Animation
+        let groundY = 0;
+        let playerX = 0;
+        let playerY = 0; // Current Y offset above ground (0 when standing)
+        let playerVy = 0;
+        const gravity = 0.8;
+        const jumpImpulse = -14;
+        let isGrounded = true;
+        let jumpPhaseTimer = 0; // Timer to manage jump start sprite (image_2) vs jumping sprite (image-1_1)
+
+        // Rope rotation physics
+        let ropeAngle = -Math.PI / 2; // Start from top
+        let baseRopeSpeed = 0.045; // Radians per frame
+        let currentRopeSpeed = baseRopeSpeed;
+        let hasPassedCurrentTurn = false; // Flag to check if current swing scored or missed
+
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            groundY = canvas.height * 0.78;
+            playerX = canvas.width / 2;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function resetGame() {
+            score = 0;
+            scoreDisplay.textContent = score;
+            playerY = 0;
+            playerVy = 0;
+            isGrounded = true;
+            jumpPhaseTimer = 0;
+            ropeAngle = -Math.PI / 2;
+            currentRopeSpeed = baseRopeSpeed;
+            hasPassedCurrentTurn = false;
+        }
+
+        function triggerJump() {
+            if (!isRunning) return;
+            sound.init();
+            if (isGrounded) {
+                playerVy = jumpImpulse;
+                isGrounded = false;
+                jumpPhaseTimer = 8; // Duration (frames) to show jump_start sprite before switching to airborne jumping sprite
+                sound.playJump();
+            }
+        }
+
+        // Event Listeners for controls
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.key === ' ' || e.code === 'ArrowUp') {
+                e.preventDefault();
+                triggerJump();
+            }
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            triggerJump();
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 0) {
+                triggerJump();
+            }
+        });
+
+        startBtn.addEventListener('click', () => {
+            sound.init();
+            resetGame();
+            startOverlay.classList.add('hidden');
+            gameoverOverlay.classList.add('hidden');
+            isRunning = true;
+            requestAnimationFrame(gameLoop);
+        });
+
+        restartBtn.addEventListener('click', () => {
+            sound.init();
+            resetGame();
+            startOverlay.classList.add('hidden');
+            gameoverOverlay.classList.add('hidden');
+            isRunning = true;
+            requestAnimationFrame(gameLoop);
+        });
+
+        function gameOver() {
+            isRunning = false;
+            sound.playGameOver();
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('jumpRopeHighScore', highScore.toString());
+                highScoreDisplay.textContent = highScore;
+            }
+
+            finalScoreDisplay.textContent = `${score} 回`;
+            finalHighScoreDisplay.textContent = `ハイスコア: ${highScore} 回`;
+            gameoverOverlay.classList.remove('hidden');
+        }
+
+        function update() {
+            if (!isRunning) return;
+
+            // Update player vertical motion
+            if (!isGrounded) {
+                playerVy += gravity;
+                playerY += playerVy;
+
+                if (jumpPhaseTimer > 0) {
+                    jumpPhaseTimer--;
+                }
+
+                if (playerY >= 0) {
+                    playerY = 0;
+                    playerVy = 0;
+                    isGrounded = true;
+                }
+            }
+
+            // Update rope rotation
+            const prevAngle = ropeAngle;
+            ropeAngle += currentRopeSpeed;
+
+            // Check when rope passes through bottom arc (around Math.PI / 2)
+            const targetBottom = Math.PI / 2;
+
+            const prevMod = (prevAngle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+            const currMod = (ropeAngle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+
+            // Detect passing bottom point
+            if ((prevMod < targetBottom && currMod >= targetBottom) ||
+                (prevMod > 5 && currMod >= targetBottom)) {
+
+                if (!hasPassedCurrentTurn) {
+                    // Check if player is airborne (sufficient clearance, e.g., playerY < -20px)
+                    const requiredClearance = -20;
+                    if (playerY < requiredClearance) {
+                        // Successful jump!
+                        score++;
+                        scoreDisplay.textContent = score;
+                        sound.playScore();
+                        // Accelerate rope speed as score increases
+                        currentRopeSpeed = baseRopeSpeed + Math.min(score * 0.0025, 0.06);
+                        hasPassedCurrentTurn = true;
+                    } else {
+                        // Failed to jump / hit rope!
+                        gameOver();
+                        return;
+                    }
+                }
+            }
+
+            // Reset turn flag when rope is at top arc (around 3 * Math.PI / 2)
+            const targetTop = (3 * Math.PI) / 2;
+            if (currMod > targetTop || currMod < targetBottom / 2) {
+                hasPassedCurrentTurn = false;
+            }
+        }
+
+        function renderAll() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Ground & Shadow
+            ctx.save();
+            ctx.fillStyle = '#16161e';
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+
+            ctx.strokeStyle = '#2ac3de';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(canvas.width, groundY);
+            ctx.stroke();
+
+            // Player Shadow
+            const shadowScale = Math.max(0.3, 1 + playerY / 200);
+            const shadowAlpha = Math.max(0.1, 0.4 + playerY / 300);
+            ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+            ctx.beginPath();
+            ctx.ellipse(playerX, groundY, 45 * shadowScale, 12 * shadowScale, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Select active character image
+            let currentImg = imgStanding;
+            if (!isGrounded) {
+                if (jumpPhaseTimer > 0) {
+                    currentImg = imgJumpStart; // 3枚目: ジャンプ開始
+                } else {
+                    currentImg = imgJumping;   // 2枚目: ジャンプ中
+                }
+            } else {
+                currentImg = imgStanding;     // 1枚目: 立ち絵
+            }
+
+            const imgHeight = 220;
+            const imgWidth = (currentImg.complete && currentImg.naturalWidth && currentImg.naturalHeight)
+                ? (imgHeight * currentImg.naturalWidth / currentImg.naturalHeight)
+                : 130;
+
+            const drawX = playerX - imgWidth / 2;
+            const drawY = groundY + playerY - imgHeight + 10;
+
+            // Rope calculations
+            const ropeYPos = Math.sin(ropeAngle);
+            const ropeXPos = Math.cos(ropeAngle);
+
+            const ropePivotX = playerX;
+            const ropePivotY = groundY - 90;
+            const ropeRadiusY = 145;
+
+            const leftHandX = playerX - 35;
+            const leftHandY = groundY + playerY - 95;
+            const rightHandX = playerX + 35;
+            const rightHandY = groundY + playerY - 95;
+
+            const ropeVertexX = ropePivotX + ropeXPos * 30;
+            const ropeVertexY = ropePivotY + ropeYPos * ropeRadiusY;
+
+            const isRopeBehind = ropeYPos < 0;
+
+            const drawRope = () => {
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(leftHandX, leftHandY);
+                ctx.quadraticCurveTo(ropeVertexX, ropeVertexY, rightHandX, rightHandY);
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = '#ff9e64';
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = 'rgba(255, 158, 100, 0.8)';
+                ctx.lineCap = 'round';
+                ctx.stroke();
+                ctx.restore();
+            };
+
+            const drawPlayer = () => {
+                if (currentImg.complete && currentImg.naturalWidth > 0) {
+                    ctx.drawImage(currentImg, drawX, drawY, imgWidth, imgHeight);
+                }
+            };
+
+            // Depth ordering: if rope is behind player, draw rope first
+            if (isRopeBehind) {
+                drawRope();
+                drawPlayer();
+            } else {
+                drawPlayer();
+                drawRope();
+            }
+        }
+
+        function gameLoop() {
+            if (!isRunning) return;
+            update();
+            renderAll();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initial render
+        renderAll();
+    </script>
+</body>
+</html>
