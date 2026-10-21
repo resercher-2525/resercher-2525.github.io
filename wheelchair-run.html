@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>車椅子病院暴走ゲーム - Wheelchair Hospital Run</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: #0d1117;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 100vh;
+            max-height: 700px;
+            background: #1e293b;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+
+        /* Top HUD */
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hud-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .hud-item {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(8px);
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            color: #38bdf8;
+            text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hud-item span {
+            color: #ffffff;
+        }
+
+        .hp-hearts {
+            color: #ef4444;
+            font-size: 20px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+        }
+
+        .nav-home {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            pointer-events: auto;
+            text-decoration: none;
+            color: #cbd5e1;
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(8px);
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s;
+            z-index: 6;
+        }
+
+        .nav-home:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #38bdf8;
+        }
+
+        /* On-screen touch controls for mobile */
+        #touch-controls {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: none;
+            z-index: 8;
+        }
+
+        .dpad, .action-pad {
+            display: grid;
+            gap: 8px;
+            pointer-events: auto;
+        }
+
+        .dpad {
+            grid-template-columns: repeat(3, 50px);
+            grid-template-rows: repeat(2, 50px);
+        }
+
+        .touch-btn {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            touch-action: manipulation;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: background 0.1s;
+        }
+
+        .touch-btn:active {
+            background: rgba(56, 189, 248, 0.5);
+            transform: scale(0.95);
+        }
+
+        .btn-up { grid-column: 2; grid-row: 1; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-down { grid-column: 2; grid-row: 2; }
+        .btn-right { grid-column: 3; grid-row: 2; }
+
+        .btn-dash {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: rgba(239, 68, 68, 0.65);
+            font-size: 14px;
+            border-color: rgba(252, 165, 165, 0.5);
+        }
+
+        .btn-dash:active {
+            background: rgba(220, 38, 38, 0.85);
+        }
+
+        /* Hide touch controls on desktop unless touched */
+        @media (min-width: 1024px) {
+            #touch-controls {
+                opacity: 0.3;
+                transition: opacity 0.3s;
+            }
+            #touch-controls:hover {
+                opacity: 1;
+            }
+        }
+
+        /* Overlay screens */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            transition: opacity 0.3s ease;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            font-size: 36px;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+        }
+
+        .instructions {
+            font-size: 15px;
+            color: #94a3b8;
+            margin-bottom: 24px;
+            line-height: 1.6;
+            max-width: 500px;
+        }
+
+        .instructions span {
+            display: inline-block;
+            background: rgba(56, 189, 248, 0.2);
+            color: #38bdf8;
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            font-weight: bold;
+            margin: 2px;
+        }
+
+        .btn {
+            padding: 14px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #38bdf8, #6366f1);
+            color: #ffffff;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(56, 189, 248, 0.6);
+            background: linear-gradient(135deg, #60a5fa, #818cf8);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        #final-score-container {
+            margin-bottom: 24px;
+        }
+
+        .score-val {
+            font-size: 48px;
+            color: #fbbf24;
+            font-weight: bold;
+            text-shadow: 0 0 15px rgba(251, 191, 36, 0.5);
+        }
+
+        .high-score-val {
+            font-size: 18px;
+            color: #4ade80;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <a href="index.html" class="nav-home">← ホームに戻る</a>
+
+        <div id="hud">
+            <div style="width: 120px;"></div>
+            <div class="hud-group">
+                <div class="hud-item">HP: <span class="hp-hearts" id="hp-display">♥♥♥</span></div>
+                <div class="hud-item">SCORE: <span id="score-display">0</span></div>
+                <div class="hud-item">BEST: <span id="high-score-display">0</span></div>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Touch Controls UI -->
+        <div id="touch-controls">
+            <div class="dpad">
+                <button class="touch-btn btn-up" id="t-up">▲</button>
+                <button class="touch-btn btn-left" id="t-left">◀</button>
+                <button class="touch-btn btn-down" id="t-down">▼</button>
+                <button class="touch-btn btn-right" id="t-right">▶</button>
+            </div>
+            <div class="action-pad">
+                <button class="touch-btn btn-dash" id="t-dash">DASH<br>⚡</button>
+            </div>
+        </div>
+
+        <!-- Start Overlay -->
+        <div id="start-overlay" class="overlay">
+            <h1>車椅子病院暴走ゲーム</h1>
+            <p class="instructions">
+                車椅子に乗って病院の廊下を爆走しよう！<br>
+                <span>←</span> <span>→</span> (または <span>A</span> <span>D</span>) で 4つのレーン移動<br>
+                <span>↑</span> <span>↓</span> (または <span>W</span> <span>S</span>) で 前後移動<br>
+                <span>SPACE</span> キーで 爆走ブースト！<br><br>
+                点滴スタンドやストレッチャーなどの障害物を避けて、栄養ドリンクを集めよう！
+            </p>
+            <button class="btn" id="start-btn">爆走スタート！</button>
+        </div>
+
+        <!-- Game Over Overlay -->
+        <div id="gameover-overlay" class="overlay hidden">
+            <h1>GAME OVER</h1>
+            <p style="color:#94a3b8; margin-bottom: 12px;">病院の障害物に激突してしまった...</p>
+            <div id="final-score-container">
+                <div class="score-val" id="final-score">0 m</div>
+                <div class="high-score-val" id="final-high-score">ハイスコア: 0 m</div>
+            </div>
+            <button class="btn" id="restart-btn">もう一度爆走する</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Web Audio API Controller ---
+        class SoundEffects {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        this.ctx = new AudioContext();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playHit() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+
+                const now = this.ctx.currentTime;
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now + 0.25);
+
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+
+            playItem() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+
+                const now = this.ctx.currentTime;
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+                osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+
+            playHeal() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+
+                const now = this.ctx.currentTime;
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.3);
+
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+
+            playDash() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+
+                const now = this.ctx.currentTime;
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(400, now + 0.15);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+
+            playGameOver() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+
+                const now = this.ctx.currentTime;
+                osc.frequency.setValueAtTime(250, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.6);
+
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.6);
+            }
+        }
+
+        const sound = new SoundEffects();
+
+        // --- Game Setup & Canvas ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const startOverlay = document.getElementById('start-overlay');
+        const gameoverOverlay = document.getElementById('gameover-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+
+        const hpDisplay = document.getElementById('hp-display');
+        const scoreDisplay = document.getElementById('score-display');
+        const highScoreDisplay = document.getElementById('high-score-display');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const finalHighScoreDisplay = document.getElementById('final-high-score');
+
+        // Assets
+        const imgPlayerFace = new Image();
+        imgPlayerFace.src = 'images/wheelchair_face.webp';
+
+        // High Score
+        let highScore = parseInt(localStorage.getItem('wheelchairRunHighScore') || '0', 10);
+        highScoreDisplay.textContent = highScore + ' m';
+
+        // Corridor Geometry & Lanes (4 Lanes)
+        const NUM_LANES = 4;
+        let laneWidth = 0;
+        let corridorLeft = 0;
+        let corridorRight = 0;
+        let corridorWidth = 0;
+
+        // Game State
+        let isRunning = false;
+        let distance = 0; // Score in meters
+        let hp = 3;
+        let invulnerableTimer = 0; // Frames of invulnerability when hit
+
+        // Player Attributes
+        const player = {
+            lane: 1, // 0, 1, 2, 3
+            targetX: 0,
+            x: 0,
+            y: 0, // Y position relative to canvas
+            width: 70,
+            height: 90,
+            speedY: 5,
+            isDashing: false,
+            dashEnergy: 100,
+            dashCooldown: 0,
+            tilt: 0
+        };
+
+        // Scroll & Speed Settings
+        let baseScrollSpeed = 4.5;
+        let currentScrollSpeed = baseScrollSpeed;
+        let bgScrollOffsetY = 0;
+
+        // Obstacles and Items Arrays
+        const obstacles = [];
+        const items = [];
+        const particles = [];
+
+        // Input Handling
+        const keys = {
+            ArrowUp: false,
+            ArrowDown: false,
+            ArrowLeft: false,
+            ArrowRight: false,
+            KeyW: false,
+            KeyS: false,
+            KeyA: false,
+            KeyD: false,
+            Space: false
+        };
+
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+
+            // Define hospital corridor bounds (leaving room for hospital side walls)
+            corridorWidth = Math.min(canvas.width * 0.82, 580);
+            corridorLeft = (canvas.width - corridorWidth) / 2;
+            corridorRight = corridorLeft + corridorWidth;
+            laneWidth = corridorWidth / NUM_LANES;
+
+            // Reset player initial positioning
+            updatePlayerTargetX();
+            player.x = player.targetX;
+            if (!isRunning) {
+                player.y = canvas.height * 0.35;
+            }
+        }
+
+        function getLaneCenterX(laneIndex) {
+            return corridorLeft + laneWidth * laneIndex + laneWidth / 2;
+        }
+
+        function updatePlayerTargetX() {
+            player.targetX = getLaneCenterX(player.lane);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function resetGame() {
+            distance = 0;
+            hp = 3;
+            invulnerableTimer = 0;
+            updateHpDisplay();
+            scoreDisplay.textContent = '0 m';
+
+            player.lane = 1;
+            updatePlayerTargetX();
+            player.x = player.targetX;
+            player.y = canvas.height * 0.35;
+            player.dashEnergy = 100;
+            player.tilt = 0;
+
+            currentScrollSpeed = baseScrollSpeed;
+            bgScrollOffsetY = 0;
+
+            obstacles.length = 0;
+            items.length = 0;
+            particles.length = 0;
+        }
+
+        function updateHpDisplay() {
+            let heartsStr = '';
+            for (let i = 0; i < 3; i++) {
+                if (i < hp) {
+                    heartsStr += '♥';
+                } else {
+                    heartsStr += '♡';
+                }
+            }
+            hpDisplay.textContent = heartsStr;
+        }
+
+        // --- Controls Event Listeners ---
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+            }
+            if (!isRunning) {
+                if (e.code === 'Space' || e.code === 'Enter') {
+                    if (!startOverlay.classList.contains('hidden')) {
+                        startBtn.click();
+                    } else if (!gameoverOverlay.classList.contains('hidden')) {
+                        restartBtn.click();
+                    }
+                }
+                return;
+            }
+
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+                if (!keys[e.code] && player.lane > 0) {
+                    player.lane--;
+                    updatePlayerTargetX();
+                    sound.init();
+                }
+                keys[e.code] = true;
+            }
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+                if (!keys[e.code] && player.lane < NUM_LANES - 1) {
+                    player.lane++;
+                    updatePlayerTargetX();
+                    sound.init();
+                }
+                keys[e.code] = true;
+            }
+            if (e.code === 'ArrowUp' || e.code === 'KeyW') keys[e.code] = true;
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') keys[e.code] = true;
+            if (e.code === 'Space') {
+                keys.Space = true;
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code in keys) {
+                keys[e.code] = false;
+            }
+        });
+
+        // Touch Control Buttons
+        function setupTouchButton(id, onActionPress, onHoldStart, onHoldEnd) {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+
+            btn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                sound.init();
+                if (onActionPress) onActionPress();
+                if (onHoldStart) onHoldStart();
+            });
+
+            btn.addEventListener('pointerup', (e) => {
+                e.preventDefault();
+                if (onHoldEnd) onHoldEnd();
+            });
+
+            btn.addEventListener('pointerleave', (e) => {
+                if (onHoldEnd) onHoldEnd();
+            });
+        }
+
+        setupTouchButton('t-left', () => {
+            if (isRunning && player.lane > 0) {
+                player.lane--;
+                updatePlayerTargetX();
+            }
+        });
+
+        setupTouchButton('t-right', () => {
+            if (isRunning && player.lane < NUM_LANES - 1) {
+                player.lane++;
+                updatePlayerTargetX();
+            }
+        });
+
+        setupTouchButton('t-up', null, () => { keys.ArrowUp = true; }, () => { keys.ArrowUp = false; });
+        setupTouchButton('t-down', null, () => { keys.ArrowDown = true; }, () => { keys.ArrowDown = false; });
+        setupTouchButton('t-dash', null, () => { keys.Space = true; }, () => { keys.Space = false; });
+
+        startBtn.addEventListener('click', () => {
+            sound.init();
+            resetGame();
+            startOverlay.classList.add('hidden');
+            gameoverOverlay.classList.add('hidden');
+            isRunning = true;
+            requestAnimationFrame(gameLoop);
+        });
+
+        restartBtn.addEventListener('click', () => {
+            sound.init();
+            resetGame();
+            startOverlay.classList.add('hidden');
+            gameoverOverlay.classList.add('hidden');
+            isRunning = true;
+            requestAnimationFrame(gameLoop);
+        });
+
+        function gameOver() {
+            isRunning = false;
+            sound.playGameOver();
+
+            const finalDist = Math.floor(distance);
+            if (finalDist > highScore) {
+                highScore = finalDist;
+                localStorage.setItem('wheelchairRunHighScore', highScore.toString());
+                highScoreDisplay.textContent = highScore + ' m';
+            }
+
+            finalScoreDisplay.textContent = `${finalDist} m`;
+            finalHighScoreDisplay.textContent = `ハイスコア: ${highScore} m`;
+            gameoverOverlay.classList.remove('hidden');
+        }
+
+        // --- Obstacle & Item Types ---
+        const OBSTACLE_TYPES = [
+            { type: 'iv_stand', name: '点滴スタンド', width: 44, height: 60, color: '#94a3b8' },
+            { type: 'stretcher', name: '診察台', width: 68, height: 80, color: '#38bdf8' },
+            { type: 'caution_sign', name: '水濡れ注意看板', width: 48, height: 50, color: '#f59e0b' },
+            { type: 'doctor', name: '移動中の医師', width: 50, height: 65, color: '#10b981' }
+        ];
+
+        const ITEM_TYPES = [
+            { type: 'energy_drink', name: '栄養ドリンク', width: 36, height: 42, points: 50, heal: 0 },
+            { type: 'medicine', name: '救急箱', width: 40, height: 40, points: 20, heal: 1 }
+        ];
+
+        let obstacleSpawnTimer = 0;
+        let itemSpawnTimer = 0;
+
+        function spawnObstaclesAndItems() {
+            obstacleSpawnTimer--;
+            if (obstacleSpawnTimer <= 0) {
+                // Determine spawn lane randomly
+                const spawnLane = Math.floor(Math.random() * NUM_LANES);
+                const laneX = getLaneCenterX(spawnLane);
+                const obsType = OBSTACLE_TYPES[Math.floor(Math.random() * OBSTACLE_TYPES.length)];
+
+                // Obstacles spawn at bottom of canvas (Pattern B: driving south down corridor)
+                // and scroll upwards towards top of canvas
+                obstacles.push({
+                    lane: spawnLane,
+                    x: laneX,
+                    y: canvas.height + 60,
+                    width: obsType.width,
+                    height: obsType.height,
+                    type: obsType.type,
+                    color: obsType.color
+                });
+
+                // Spawn interval decreases slightly as distance increases
+                obstacleSpawnTimer = Math.max(25, Math.floor(65 - Math.min(distance * 0.05, 30) + Math.random() * 20));
+            }
+
+            itemSpawnTimer--;
+            if (itemSpawnTimer <= 0) {
+                const spawnLane = Math.floor(Math.random() * NUM_LANES);
+                const laneX = getLaneCenterX(spawnLane);
+                // 80% chance energy drink, 20% medicine
+                const isMed = Math.random() < 0.2;
+                const itemType = isMed ? ITEM_TYPES[1] : ITEM_TYPES[0];
+
+                items.push({
+                    lane: spawnLane,
+                    x: laneX,
+                    y: canvas.height + 50,
+                    width: itemType.width,
+                    height: itemType.height,
+                    type: itemType.type,
+                    points: itemType.points,
+                    heal: itemType.heal
+                });
+
+                itemSpawnTimer = Math.floor(90 + Math.random() * 80);
+            }
+        }
+
+        function createSparks(x, y, color, count = 12) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2 + Math.random() * 5;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 20 + Math.random() * 15,
+                    maxLife: 35,
+                    color: color,
+                    size: 3 + Math.random() * 4
+                });
+            }
+        }
+
+        // --- Update Logic ---
+        function update() {
+            if (!isRunning) return;
+
+            // Handle Dash / Boost
+            let isDashing = false;
+            if (keys.Space && player.dashEnergy > 5) {
+                isDashing = true;
+                player.dashEnergy = Math.max(0, player.dashEnergy - 2.5);
+                currentScrollSpeed = baseScrollSpeed * 1.8;
+                if (Math.random() < 0.3) sound.playDash();
+
+                // Dash trail particles
+                particles.push({
+                    x: player.x + (Math.random() - 0.5) * 30,
+                    y: player.y + player.height / 2,
+                    vx: (Math.random() - 0.5) * 1,
+                    vy: 4 + Math.random() * 3,
+                    life: 12,
+                    maxLife: 12,
+                    color: '#38bdf8',
+                    size: 4 + Math.random() * 4
+                });
+            } else {
+                currentScrollSpeed = baseScrollSpeed + Math.min(distance * 0.005, 3.5);
+                player.dashEnergy = Math.min(100, player.dashEnergy + 0.4);
+            }
+            player.isDashing = isDashing;
+
+            // Vertical movement (Up/Down) within bounds (Pattern B)
+            const moveUp = keys.ArrowUp || keys.KeyW;
+            const moveDown = keys.ArrowDown || keys.KeyS;
+            if (moveUp) {
+                player.y = Math.max(80, player.y - player.speedY);
+            }
+            if (moveDown) {
+                player.y = Math.min(canvas.height - 120, player.y + player.speedY);
+            }
+
+            // Smooth X interpolation towards target lane
+            const dx = player.targetX - player.x;
+            player.x += dx * 0.22;
+
+            // Tilt angle during lane change
+            player.tilt = dx * 0.005;
+
+            // Distance progression
+            distance += currentScrollSpeed * 0.08;
+            scoreDisplay.textContent = Math.floor(distance) + ' m';
+
+            // Hospital corridor background scrolling offset
+            bgScrollOffsetY = (bgScrollOffsetY - currentScrollSpeed) % 80;
+
+            // Spawn obstacles and items
+            spawnObstaclesAndItems();
+
+            // Invulnerability timer countdown
+            if (invulnerableTimer > 0) {
+                invulnerableTimer--;
+            }
+
+            // Update Obstacles (moving upwards in Pattern B relative to driving south)
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                obs.y -= currentScrollSpeed; // Obstacle moves towards top of screen
+
+                // Hitbox check
+                const hitMarginX = 14;
+                const hitMarginY = 16;
+                if (
+                    invulnerableTimer === 0 &&
+                    Math.abs(player.x - obs.x) < (player.width / 2 + obs.width / 2 - hitMarginX) &&
+                    Math.abs(player.y - obs.y) < (player.height / 2 + obs.height / 2 - hitMarginY)
+                ) {
+                    // Collision!
+                    hp--;
+                    updateHpDisplay();
+                    sound.playHit();
+                    createSparks(player.x, player.y, '#ef4444', 16);
+                    invulnerableTimer = 45; // 45 frames (~0.75s) invulnerability
+
+                    obstacles.splice(i, 1);
+
+                    if (hp <= 0) {
+                        gameOver();
+                        return;
+                    }
+                    continue;
+                }
+
+                // Remove when off top screen
+                if (obs.y < -100) {
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // Update Items
+            for (let i = items.length - 1; i >= 0; i--) {
+                const item = items[i];
+                item.y -= currentScrollSpeed;
+
+                // Pick-up check
+                if (
+                    Math.abs(player.x - item.x) < (player.width / 2 + item.width / 2) &&
+                    Math.abs(player.y - item.y) < (player.height / 2 + item.height / 2)
+                ) {
+                    // Collect!
+                    if (item.heal > 0 && hp < 3) {
+                        hp = Math.min(3, hp + item.heal);
+                        updateHpDisplay();
+                        sound.playHeal();
+                        createSparks(item.x, item.y, '#4ade80', 14);
+                    } else {
+                        distance += item.points;
+                        sound.playItem();
+                        createSparks(item.x, item.y, '#fbbf24', 12);
+                    }
+
+                    items.splice(i, 1);
+                    continue;
+                }
+
+                if (item.y < -80) {
+                    items.splice(i, 1);
+                }
+            }
+
+            // Update particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // --- Render Logic ---
+        function renderAll() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Draw Hospital Walls Outside Corridor
+            ctx.fillStyle = '#0f172a'; // Dark hospital border
+            ctx.fillRect(0, 0, corridorLeft, canvas.height);
+            ctx.fillRect(corridorRight, 0, canvas.width - corridorRight, canvas.height);
+
+            // Wall hazard stripes / baseboards
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(corridorLeft - 10, 0, 10, canvas.height);
+            ctx.fillRect(corridorRight, 0, 10, canvas.height);
+
+            // 2. Hospital Corridor Tile Floor
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(corridorLeft, 0, corridorWidth, canvas.height);
+
+            // Tile grid lines & Lane markings
+            ctx.lineWidth = 2;
+
+            // Vertical lane divider lines
+            for (let l = 1; l < NUM_LANES; l++) {
+                const laneX = corridorLeft + l * laneWidth;
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+                ctx.setLineDash([12, 12]);
+                ctx.beginPath();
+                ctx.moveTo(laneX, 0);
+                ctx.lineTo(laneX, canvas.height);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]); // Reset line dash
+
+            // Horizontal tile grid lines moving with bgScrollOffsetY
+            const tileSize = 80;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+            ctx.lineWidth = 1;
+            for (let y = bgScrollOffsetY; y < canvas.height + tileSize; y += tileSize) {
+                ctx.beginPath();
+                ctx.moveTo(corridorLeft, y);
+                ctx.lineTo(corridorRight, y);
+                ctx.stroke();
+            }
+
+            // 3. Hospital Doors on Wall Borders
+            const doorHeight = 90;
+            for (let y = bgScrollOffsetY % 160; y < canvas.height + 160; y += 160) {
+                // Left Wall Door
+                ctx.fillStyle = '#475569';
+                ctx.fillRect(corridorLeft - 22, y, 12, doorHeight);
+                ctx.fillStyle = '#fbbf24'; // Door sign
+                ctx.fillRect(corridorLeft - 22, y + 20, 12, 12);
+
+                // Right Wall Door
+                ctx.fillStyle = '#475569';
+                ctx.fillRect(corridorRight + 10, y, 12, doorHeight);
+                ctx.fillStyle = '#fbbf24';
+                ctx.fillRect(corridorRight + 10, y + 20, 12, 12);
+            }
+
+            // 4. Draw Items
+            items.forEach(item => {
+                ctx.save();
+                ctx.translate(item.x, item.y);
+
+                if (item.type === 'energy_drink') {
+                    // Energy Drink Can
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.beginPath();
+                    ctx.roundRect(-item.width/2, -item.height/2, item.width, item.height, 6);
+                    ctx.fill();
+
+                    // Lightning icon
+                    ctx.fillStyle = '#1e293b';
+                    ctx.font = 'bold 18px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('⚡', 0, 0);
+                } else {
+                    // Medicine First Aid Box
+                    ctx.fillStyle = '#ef4444';
+                    ctx.beginPath();
+                    ctx.roundRect(-item.width/2, -item.height/2, item.width, item.height, 6);
+                    ctx.fill();
+
+                    // White Cross
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(-4, -12, 8, 24);
+                    ctx.fillRect(-12, -4, 24, 8);
+                }
+
+                ctx.restore();
+            });
+
+            // 5. Draw Obstacles
+            obstacles.forEach(obs => {
+                ctx.save();
+                ctx.translate(obs.x, obs.y);
+
+                if (obs.type === 'iv_stand') {
+                    // IV Drip Stand
+                    ctx.fillStyle = '#cbd5e1';
+                    ctx.fillRect(-3, -obs.height/2, 6, obs.height);
+                    // Base wheels
+                    ctx.fillStyle = '#475569';
+                    ctx.beginPath();
+                    ctx.arc(-15, obs.height/2 - 4, 5, 0, Math.PI * 2);
+                    ctx.arc(15, obs.height/2 - 4, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    // IV Bags at top
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.fillRect(-14, -obs.height/2, 10, 18);
+                    ctx.fillRect(4, -obs.height/2, 10, 18);
+                } else if (obs.type === 'stretcher') {
+                    // Stretcher Bed
+                    ctx.fillStyle = '#64748b';
+                    ctx.beginPath();
+                    ctx.roundRect(-obs.width/2, -obs.height/2, obs.width, obs.height, 8);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#e2e8f0'; // Pillow/bed sheet
+                    ctx.fillRect(-obs.width/2 + 6, -obs.height/2 + 6, obs.width - 12, obs.height - 12);
+                    ctx.fillStyle = '#ef4444'; // Red cross on bed
+                    ctx.fillRect(-3, -10, 6, 20);
+                    ctx.fillRect(-10, -3, 20, 6);
+                } else if (obs.type === 'caution_sign') {
+                    // Caution Wet Floor Triangle
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.beginPath();
+                    ctx.moveTo(0, -obs.height/2);
+                    ctx.lineTo(-obs.width/2, obs.height/2);
+                    ctx.lineTo(obs.width/2, obs.height/2);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.fillStyle = '#1e293b';
+                    ctx.font = 'bold 16px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('⚠', 0, 4);
+                } else {
+                    // Walking Doctor / Nurse
+                    ctx.fillStyle = '#10b981'; // Scrubs
+                    ctx.beginPath();
+                    ctx.roundRect(-obs.width/2, -obs.height/2 + 15, obs.width, obs.height - 15, 8);
+                    ctx.fill();
+                    // Head
+                    ctx.fillStyle = '#fde047';
+                    ctx.beginPath();
+                    ctx.arc(0, -obs.height/2 + 12, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            });
+
+            // 6. Draw Player (Wheelchair with Face looking towards screen)
+            if (invulnerableTimer % 6 < 3) { // Flashing when hit
+                ctx.save();
+                ctx.translate(player.x, player.y);
+                ctx.rotate(player.tilt);
+
+                // Wheelchair Shadow
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                ctx.beginPath();
+                ctx.ellipse(0, player.height / 2 - 5, player.width / 2 + 5, 12, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Wheelchair Side Wheels
+                ctx.fillStyle = '#475569';
+                ctx.fillRect(-player.width / 2 - 6, -player.height / 4, 8, player.height / 1.5);
+                ctx.fillRect(player.width / 2 - 2, -player.height / 4, 8, player.height / 1.5);
+
+                ctx.fillStyle = '#cbd5e1'; // Chrome rims
+                ctx.fillRect(-player.width / 2 - 4, -player.height / 6, 4, player.height / 2);
+                ctx.fillRect(player.width / 2, -player.height / 6, 4, player.height / 2);
+
+                // Wheelchair Base Frame & Seat
+                ctx.fillStyle = '#0284c7';
+                ctx.fillRect(-player.width / 2 + 4, -player.height / 4, player.width - 8, player.height / 2 + 10);
+
+                // Front Wheelchair Handles
+                ctx.fillStyle = '#1e293b';
+                ctx.fillRect(-player.width / 2 + 2, -player.height / 2 - 5, 10, 12);
+                ctx.fillRect(player.width / 2 - 12, -player.height / 2 - 5, 10, 12);
+
+                // Player Face Image (Face looking at camera / facing south)
+                const faceSize = player.width * 1.1;
+                const faceY = -player.height / 2 + 5;
+
+                if (imgPlayerFace.complete && imgPlayerFace.naturalWidth > 0) {
+                    ctx.drawImage(imgPlayerFace, -faceSize / 2, faceY - faceSize / 4, faceSize, faceSize);
+                } else {
+                    // Fallback face circle if image not loaded
+                    ctx.fillStyle = '#fde047';
+                    ctx.beginPath();
+                    ctx.arc(0, faceY, faceSize / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Boost Flame / Speed lines if Dashing
+                if (player.isDashing) {
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.beginPath();
+                    ctx.moveTo(-15, player.height / 2 + 5);
+                    ctx.lineTo(0, player.height / 2 + 25 + Math.random() * 10);
+                    ctx.lineTo(15, player.height / 2 + 5);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+
+            // 7. Draw Particles
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.life / p.maxLife;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // 8. Dash Energy Bar HUD on Canvas Bottom Left
+            const barW = 140;
+            const barH = 10;
+            const barX = 20;
+            const barY = canvas.height - 25;
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
+            ctx.fillRect(barX - 5, barY - 18, barW + 10, barH + 24);
+
+            ctx.fillStyle = '#cbd5e1';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText('DASH ENERGY', barX, barY - 5);
+
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(barX, barY, barW, barH);
+
+            ctx.fillStyle = player.dashEnergy > 20 ? '#38bdf8' : '#ef4444';
+            ctx.fillRect(barX, barY, (barW * player.dashEnergy) / 100, barH);
+            ctx.restore();
+        }
+
+        // --- Main Game Loop ---
+        function gameLoop() {
+            if (!isRunning) return;
+            update();
+            renderAll();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initial Render
+        renderAll();
+    </script>
+</body>
+</html>
