@@ -348,15 +348,15 @@
 
         // Rope rotation physics
         let ropeAngle = -Math.PI / 2; // Start from top
+        let nextCheckAngle = Math.PI / 2; // Next bottom collision target angle
         let baseRopeSpeed = 0.045; // Radians per frame
         let currentRopeSpeed = baseRopeSpeed;
-        let hasPassedCurrentTurn = false; // Flag to check if current swing scored or missed
 
         function resizeCanvas() {
             const container = document.getElementById('game-container');
             canvas.width = container.clientWidth;
             canvas.height = container.clientHeight;
-            groundY = canvas.height * 0.78;
+            groundY = canvas.height * 0.82;
             playerX = canvas.width / 2;
         }
 
@@ -370,9 +370,9 @@
             playerVy = 0;
             isGrounded = true;
             jumpPhaseTimer = 0;
-            ropeAngle = -Math.PI / 2;
+            ropeAngle = -Math.PI / 2; // Rope starts safely overhead (top)
+            nextCheckAngle = Math.PI / 2; // First check at bottom arc
             currentRopeSpeed = baseRopeSpeed;
-            hasPassedCurrentTurn = false;
         }
 
         function triggerJump() {
@@ -390,6 +390,15 @@
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space' || e.key === ' ' || e.code === 'ArrowUp') {
                 e.preventDefault();
+                if (!isRunning) {
+                    // Start or restart game on Space key if overlay is visible
+                    if (!startOverlay.classList.contains('hidden')) {
+                        startBtn.click();
+                    } else if (!gameoverOverlay.classList.contains('hidden')) {
+                        restartBtn.click();
+                    }
+                    return;
+                }
                 triggerJump();
             }
         });
@@ -457,43 +466,27 @@
                 }
             }
 
-            // Update rope rotation
-            const prevAngle = ropeAngle;
+            // Update rope rotation continuously
             ropeAngle += currentRopeSpeed;
 
-            // Check when rope passes through bottom arc (around Math.PI / 2)
-            const targetBottom = Math.PI / 2;
-
-            const prevMod = (prevAngle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-            const currMod = (ropeAngle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-
-            // Detect passing bottom point
-            if ((prevMod < targetBottom && currMod >= targetBottom) ||
-                (prevMod > 5 && currMod >= targetBottom)) {
-
-                if (!hasPassedCurrentTurn) {
-                    // Check if player is airborne (sufficient clearance, e.g., playerY < -20px)
-                    const requiredClearance = -20;
-                    if (playerY < requiredClearance) {
-                        // Successful jump!
-                        score++;
-                        scoreDisplay.textContent = score;
-                        sound.playScore();
-                        // Accelerate rope speed as score increases
-                        currentRopeSpeed = baseRopeSpeed + Math.min(score * 0.0025, 0.06);
-                        hasPassedCurrentTurn = true;
-                    } else {
-                        // Failed to jump / hit rope!
-                        gameOver();
-                        return;
-                    }
+            // Check when rope angle crosses the next bottom check angle (nextCheckAngle)
+            if (ropeAngle >= nextCheckAngle) {
+                // Check if player is airborne (sufficient clearance, e.g., playerY < -20px)
+                const requiredClearance = -20;
+                if (playerY < requiredClearance) {
+                    // Successful jump!
+                    score++;
+                    scoreDisplay.textContent = score;
+                    sound.playScore();
+                    // Accelerate rope speed as score increases
+                    currentRopeSpeed = baseRopeSpeed + Math.min(score * 0.0025, 0.06);
+                    // Schedule next check for the next full rotation (2 * PI)
+                    nextCheckAngle += Math.PI * 2;
+                } else {
+                    // Failed to jump / hit rope!
+                    gameOver();
+                    return;
                 }
-            }
-
-            // Reset turn flag when rope is at top arc (around 3 * Math.PI / 2)
-            const targetTop = (3 * Math.PI) / 2;
-            if (currMod > targetTop || currMod < targetBottom / 2) {
-                hasPassedCurrentTurn = false;
             }
         }
 
@@ -533,40 +526,60 @@
                 currentImg = imgStanding;     // 1枚目: 立ち絵
             }
 
-            const imgHeight = 220;
+            // Enlarged character height (~330px on 600px height canvas)
+            const imgHeight = Math.min(canvas.height * 0.55, 330);
             const imgWidth = (currentImg.complete && currentImg.naturalWidth && currentImg.naturalHeight)
                 ? (imgHeight * currentImg.naturalWidth / currentImg.naturalHeight)
-                : 130;
+                : 190;
 
             const drawX = playerX - imgWidth / 2;
-            const drawY = groundY + playerY - imgHeight + 10;
+            const drawY = groundY + playerY - imgHeight + 15;
 
-            // Rope calculations
-            const ropeYPos = Math.sin(ropeAngle);
-            const ropeXPos = Math.cos(ropeAngle);
+            // Hand positions relative to player height
+            const handOffsetX = imgWidth * 0.38;
+            const handOffsetY = groundY + playerY - imgHeight * 0.45;
+            const leftHandX = playerX - handOffsetX;
+            const rightHandX = playerX + handOffsetX;
 
-            const ropePivotX = playerX;
-            const ropePivotY = groundY - 90;
-            const ropeRadiusY = 145;
+            // Full 360-degree rope arc rotation physics
+            // ropeAngle goes from -PI/2 (top arc above head) -> 0 (front) -> PI/2 (bottom under feet) -> PI (back)
+            const sinA = Math.sin(ropeAngle); // -1 at top, +1 at bottom
+            const cosA = Math.cos(ropeAngle); // 0 at top/bottom, +/-1 at sides
 
-            const leftHandX = playerX - 35;
-            const leftHandY = groundY + playerY - 95;
-            const rightHandX = playerX + 35;
-            const rightHandY = groundY + playerY - 95;
+            // Rope depth sorting: behind player when sinA < 0 (moving across top/back half)
+            const isRopeBehind = sinA < 0;
 
-            const ropeVertexX = ropePivotX + ropeXPos * 30;
-            const ropeVertexY = ropePivotY + ropeYPos * ropeRadiusY;
+            // Rope loop apex Y position relative to hands:
+            // When sinA = -1 (top arc), loop arches high over head (above player top drawY)
+            // When sinA = +1 (bottom arc), loop arches low under feet (below groundY)
+            const centerHandY = handOffsetY;
+            const playerHeadTopY = drawY - 20;
+            const playerFeetBottomY = groundY + playerY + 20;
 
-            const isRopeBehind = ropeYPos < 0;
+            // Interpolate apex Y between head top and feet bottom based on sinA
+            // sinA = -1 -> playerHeadTopY
+            // sinA = +1 -> playerFeetBottomY
+            const ropeApexY = centerHandY + sinA * (imgHeight * 0.75);
 
             const drawRope = () => {
                 ctx.save();
                 ctx.beginPath();
-                ctx.moveTo(leftHandX, leftHandY);
-                ctx.quadraticCurveTo(ropeVertexX, ropeVertexY, rightHandX, rightHandY);
-                ctx.lineWidth = 6;
+
+                // Smooth continuous 3D rotation curve without snapping
+                const topDist = centerHandY - (drawY - 35);
+                const bottomDist = (groundY + playerY + 25) - centerHandY;
+                const peakY = centerHandY + sinA * (sinA < 0 ? topDist : bottomDist);
+                const controlY = 2 * peakY - centerHandY;
+
+                const controlX = playerX + cosA * 70;
+
+                ctx.moveTo(leftHandX, centerHandY);
+                ctx.quadraticCurveTo(controlX, controlY, rightHandX, centerHandY);
+
+                // Line width dynamically varies slightly with 3D depth
+                ctx.lineWidth = 7 + sinA * 1.5; // Thicker when in front, thinner when behind
                 ctx.strokeStyle = '#ff9e64';
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = 12;
                 ctx.shadowColor = 'rgba(255, 158, 100, 0.8)';
                 ctx.lineCap = 'round';
                 ctx.stroke();
